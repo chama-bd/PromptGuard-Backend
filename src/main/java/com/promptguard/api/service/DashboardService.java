@@ -1,6 +1,7 @@
 package com.promptguard.api.service;
 
 import com.promptguard.api.dto.DashboardStats;
+import com.promptguard.api.dto.DepartmentIncidentDTO; // <-- Pense à importer ton nouveau Record si tu l'as créé
 import com.promptguard.api.dto.PromptLogDto;
 import com.promptguard.api.model.PromptLog;
 import com.promptguard.api.model.Status;
@@ -43,7 +44,7 @@ public class DashboardService {
         long total = promptLogRepository.count();
         long blocked = promptLogRepository.countByStatus(Status.BLOCKED);
         long anonymized = promptLogRepository.countByStatus(Status.ANONYMIZED);
-        
+
         Double avgRiskRaw = promptLogRepository.getAverageRiskScore();
         double avgRisk = avgRiskRaw != null ? avgRiskRaw : 0.0;
 
@@ -56,5 +57,20 @@ public class DashboardService {
         }
 
         return new DashboardStats(total, blocked, anonymized, avgRisk, incidentsByDept);
+    }
+
+    /**
+     * NOUVELLE MODIFICATION AJOUTÉE POUR TON NOUVEL ENDPOINT
+     * Transforme les données brutes Object[] du repository en une liste propre de DTOs (Records)
+     */
+    public List<DepartmentIncidentDTO> getIncidentsStatsByDepartment() {
+        List<Object[]> rawData = promptLogRepository.getRiskIncidentsByDepartment();
+
+        return rawData.stream()
+                .map(row -> new DepartmentIncidentDTO(
+                        (String) row[0],                        // Nom du département
+                        ((Number) row[1]).longValue()          // Nombre d'incidents (sécurisé avec Number)
+                ))
+                .collect(Collectors.toList());
     }
 }

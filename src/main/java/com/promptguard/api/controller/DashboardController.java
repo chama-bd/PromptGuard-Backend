@@ -1,6 +1,7 @@
 package com.promptguard.api.controller;
 
 import com.promptguard.api.dto.DashboardStats;
+import com.promptguard.api.dto.DepartmentIncidentDTO; // <-- N'oublie pas d'importer ton Record si ce n'est pas automatique
 import com.promptguard.api.dto.PromptLogDto;
 import com.promptguard.api.service.DashboardService;
 import lombok.RequiredArgsConstructor;
@@ -19,13 +20,21 @@ public class DashboardController {
 
     @GetMapping("/logs")
     public ResponseEntity<List<PromptLogDto>> getLogs() {
-
         return ResponseEntity.ok(dashboardService.getAllLogs());
     }
 
     @GetMapping("/stats")
     public ResponseEntity<DashboardStats> getStats() {
-
         return ResponseEntity.ok(dashboardService.getStats());
+    }
+
+    /**
+     * NOUVEL ENDPOINT AJOUTÉ
+     * Récupère la liste propre des incidents regroupés par département
+     */
+    @GetMapping("/incidents-by-department")
+    public ResponseEntity<List<DepartmentIncidentDTO>> getIncidentsByDepartment() {
+        // Le contrôleur reste très propre et délègue au service
+        return ResponseEntity.ok(dashboardService.getIncidentsStatsByDepartment());
     }
 }
