@@ -3,12 +3,17 @@ package com.promptguard.api.service;
 import com.promptguard.api.dto.SensitiveDataMatch;
 import com.promptguard.api.model.SensitiveType;
 import com.promptguard.api.model.Status;
+import com.promptguard.api.repository.SecurityIncidentRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class ScoringService {
+
+    private final SecurityIncidentRepository securityIncidentRepository;
 
     /**
      * Calcule le score de risque basé sur les données sensibles détectées.
@@ -24,7 +29,7 @@ public class ScoringService {
      *   - Env Secret = +35 pts
      * Cap à 100.
      */
-    public int calculateScore(List<SensitiveDataMatch> matches) {
+    public int calculateScore(List<SensitiveDataMatch> matches, String username) {
         if (matches == null || matches.isEmpty()) {
             return 0;
         }
@@ -32,6 +37,16 @@ public class ScoringService {
         int score = 0;
         for (SensitiveDataMatch match : matches) {
             score += getPointsForType(match.type());
+        }
+
+        // Apprentissage adaptatif : pénaliser les récidivistes
+        if (username != null && !username.isBlank() && !"anonymous".equals(username)) {
+            int previousIncidents = securityIncidentRepository.countByUsername(username);
+            if (previousIncidents > 0) {
+                // +10% de score par incident passé (max +50%)
+                double multiplier = 1.0 + Math.min(previousIncidents * 0.10, 0.50);
+                score = (int) (score * multiplier);
+            }
         }
 
         return Math.min(score, 100);

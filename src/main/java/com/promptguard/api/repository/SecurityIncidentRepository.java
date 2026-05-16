@@ -8,4 +8,5 @@ import java.util.UUID;
 
 @Repository
 public interface SecurityIncidentRepository extends JpaRepository<SecurityIncident, UUID> {
+    int countByUsername(String username);
 }

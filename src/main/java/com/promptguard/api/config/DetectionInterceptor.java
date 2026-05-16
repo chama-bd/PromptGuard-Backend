@@ -39,13 +39,13 @@ public class DetectionInterceptor implements HandlerInterceptor {
                     List<SensitiveDataMatch> matches = detectionService.detect(dto.content());
                     
                     if (!matches.isEmpty()) {
-                        int score = scoringService.calculateScore(matches);
+                        String username = SecurityContextHolder.getContext().getAuthentication() != null ? 
+                                SecurityContextHolder.getContext().getAuthentication().getName() : "anonymous";
+                                
+                        int score = scoringService.calculateScore(matches, username);
                         Status action = scoringService.determineAction(score);
                         
                         // Log Incident and Broadcast Event
-                        String username = SecurityContextHolder.getContext().getAuthentication() != null ? 
-                                SecurityContextHolder.getContext().getAuthentication().getName() : "anonymous";
-                        
                         incidentService.logIncident(username, wrappedRequest.getServletPath(), matches, score, action);
 
                         if (action == Status.BLOCKED) {
