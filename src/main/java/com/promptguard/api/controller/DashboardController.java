@@ -2,6 +2,7 @@ package com.promptguard.api.controller;
 
 import com.promptguard.api.dto.DashboardStats;
 import com.promptguard.api.dto.DepartmentIncidentDTO; // <-- N'oublie pas d'importer ton Record si ce n'est pas automatique
+import com.promptguard.api.dto.EmployeeRiskProfileDTO;
 import com.promptguard.api.dto.PromptLogDto;
 import com.promptguard.api.service.DashboardService;
 import lombok.RequiredArgsConstructor;
@@ -36,5 +37,9 @@ public class DashboardController {
     public ResponseEntity<List<DepartmentIncidentDTO>> getIncidentsByDepartment() {
         // Le contrôleur reste très propre et délègue au service
         return ResponseEntity.ok(dashboardService.getIncidentsStatsByDepartment());
+    }
+    @GetMapping("/employees/{id}/surveillance")
+    public ResponseEntity<EmployeeRiskProfileDTO> getEmployeeSurveillance(@PathVariable String id) {
+        return ResponseEntity.ok(dashboardService.getEmployeeRiskProfile(id));
     }
 }
