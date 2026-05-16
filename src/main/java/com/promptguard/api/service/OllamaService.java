@@ -10,6 +10,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 
 @Service
 @Slf4j
@@ -55,5 +61,55 @@ public class OllamaService {
             log.error("Erreur lors de l'appel à Ollama: {}", e.getMessage());
             return "Erreur lors de la génération avec Ollama: " + e.getMessage();
         }
+    }
+
+    /**
+     * Génère une réponse via l'API locale Ollama en temps réel (SSE streaming).
+     * @param prompt La requête textuelle à envoyer au modèle.
+     * @param emitter Le SseEmitter pour envoyer les chunks au client.
+     */
+    public void streamResponse(String prompt, SseEmitter emitter) {
+        new Thread(() -> {
+            try {
+                ObjectMapper mapper = new ObjectMapper();
+                String body = mapper.writeValueAsString(Map.of(
+                    "model", model,
+                    "prompt", prompt,
+                    "stream", true
+                ));
+
+                HttpClient client = HttpClient.newHttpClient();
+                HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ollamaUrl + "/api/generate"))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(body))
+                    .build();
+
+                client.sendAsync(request, HttpResponse.BodyHandlers.ofLines())
+                    .thenAccept(response -> {
+                        response.body().forEach(line -> {
+                            try {
+                                if (line != null && !line.isBlank()) {
+                                    Map<String, Object> json = mapper.readValue(line, Map.class);
+                                    if (json.containsKey("response")) {
+                                        emitter.send(SseEmitter.event().data(json.get("response")));
+                                    }
+                                    if (Boolean.TRUE.equals(json.get("done"))) {
+                                        emitter.complete();
+                                    }
+                                }
+                            } catch (Exception e) {
+                                log.error("Erreur parsing ligne Ollama: {}", e.getMessage());
+                            }
+                        });
+                    }).exceptionally(ex -> {
+                        emitter.completeWithError(ex);
+                        return null;
+                    });
+            } catch (Exception e) {
+                log.error("Erreur init stream Ollama: {}", e.getMessage());
+                emitter.completeWithError(e);
+            }
+        }).start();
     }
 }
