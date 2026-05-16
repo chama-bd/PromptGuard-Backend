@@ -21,6 +21,7 @@ public class SecurityIncidentService {
 
     private final SecurityIncidentRepository securityIncidentRepository;
     private final EventService eventService;
+    private final OllamaService ollamaService;
 
     /**
      * Loguer un incident de sécurité en BDD et broadcaster via SSE.
@@ -34,6 +35,12 @@ public class SecurityIncidentService {
 
         String severity = determineSeverity(score);
 
+        String promptExplanation = String.format("Explique brièvement le risque de sécurité concernant la fuite des données de type: %s. Sois concis (1-2 phrases).", threatTypes);
+        String aiExplanation = ollamaService.generateResponse(promptExplanation);
+
+        String promptRecommendations = String.format("Donne une ou deux recommandations courtes pour sécuriser et éviter d'exposer ce type de données: %s. Sois très bref.", threatTypes);
+        String aiRecommendations = ollamaService.generateResponse(promptRecommendations);
+
         SecurityIncident incident = SecurityIncident.builder()
                 .threatType(threatTypes)
                 .riskScore(score)
@@ -41,8 +48,8 @@ public class SecurityIncidentService {
                 .actionTaken(action.name())
                 .username(username)
                 .endpoint(endpoint)
-                .aiExplanation("Données sensibles détectées: " + threatTypes + ". Score de risque: " + score + "/100.")
-                .aiRecommendations("Éviter de coller des données sensibles dans les prompts. Utiliser des variables d'environnement sécurisées.")
+                .aiExplanation(aiExplanation)
+                .aiRecommendations(aiRecommendations)
                 .build();
 
         SecurityIncident saved = securityIncidentRepository.saveAndFlush(incident);
