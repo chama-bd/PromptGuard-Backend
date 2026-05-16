@@ -12,7 +12,11 @@ import java.util.UUID;
 @Repository
 public interface PromptLogRepository extends JpaRepository<PromptLog, UUID> {
 
-    List<PromptLog> findAllByOrderByCreatedAtDesc();
+    @Query("SELECT pl FROM PromptLog pl JOIN FETCH pl.prompt ORDER BY pl.createdAt DESC")
+    List<PromptLog> findAllWithPromptOrderByCreatedAtDesc();
+
+    @Query("SELECT pl FROM PromptLog pl JOIN FETCH pl.prompt WHERE pl.id = :id")
+    PromptLog findByIdWithPrompt(UUID id);
 
     long countByStatus(Status status);
 

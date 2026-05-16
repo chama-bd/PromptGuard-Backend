@@ -27,7 +27,7 @@ public class AuthController {
                 .orElse(null);
 
         if (employee != null && passwordEncoder.matches(request.password(), employee.getPassword())) {
-            String token = jwtUtil.generateToken(employee.getEmail(), employee.getId().toString(), employee.getDepartment());
+            String token = jwtUtil.generateToken(employee.getEmail(), employee.getId().toString(), employee.getDepartment(), employee.getRole().name());
             return ResponseEntity.ok(new LoginResponse(
                     token,
                     employee.getId(),

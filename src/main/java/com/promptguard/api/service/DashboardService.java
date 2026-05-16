@@ -20,7 +20,7 @@ public class DashboardService {
     private final PromptLogRepository promptLogRepository;
 
     public List<PromptLogDto> getAllLogs() {
-        return promptLogRepository.findAllByOrderByCreatedAtDesc().stream()
+        return promptLogRepository.findAllWithPromptOrderByCreatedAtDesc().stream()
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
     }
