@@ -11,42 +11,42 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "prompt_logs")
+@Table(name = "security_incidents")
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class PromptLog {
+public class SecurityIncident {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    // LA RELATION UNIQUE : Lie ce Log au Prompt d'origine
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "prompt_id", nullable = false, unique = true)
-    private Prompt prompt;
+    @Column(nullable = false)
+    private String threatType;
 
     @Column(nullable = false)
-    private String employeeId;
+    private Integer riskScore;
 
     @Column(nullable = false)
-    private String department;
+    private String severity; // CRITICAL, HIGH, MEDIUM, LOW
+
+    @Column(nullable = false)
+    private String actionTaken; // BLOCKED, ANONYMIZED, ALLOWED
+
+    @Column(nullable = false)
+    private String username;
+
+    @Column(nullable = false)
+    private String endpoint;
 
     @Column(columnDefinition = "TEXT")
-    private String sanitizedPrompt;
+    private String aiExplanation;
 
     @Column(columnDefinition = "TEXT")
-    private String riskExplanation;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private Status status;
-
-    @Column(nullable = false)
-    private String leakType;
+    private String aiRecommendations;
 
     @CreationTimestamp
     @Column(updatable = false)
-    private LocalDateTime createdAt;
+    private LocalDateTime timestamp;
 }
