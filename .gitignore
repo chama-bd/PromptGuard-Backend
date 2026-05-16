@@ -1,0 +1,15 @@
+# Fichiers de compilation et dossiers lourds de Java/Maven
+target/
+*.class
+*.mar
+
+# Configuration de ton IDE (IntelliJ)
+.idea/
+*.iml
+*.iws
+
+# Logs et rapports temporaires
+*.log
+
+# Fichiers de configuration sensibles (si vous y mettez des mots de passe plus tard)
+.env
