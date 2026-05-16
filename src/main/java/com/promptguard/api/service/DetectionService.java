@@ -2,7 +2,12 @@ package com.promptguard.api.service;
 
 import com.promptguard.api.dto.SensitiveDataMatch;
 import com.promptguard.api.model.SensitiveType;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -12,7 +17,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Service
+@Slf4j
 public class DetectionService {
+
+    private final RestTemplate restTemplate = new RestTemplate();
 
     private static final Map<SensitiveType, Pattern> PATTERNS = new LinkedHashMap<>();
 
@@ -69,14 +77,47 @@ public class DetectionService {
     }
 
     /**
-     * Stub for Groq API integration as requested. 
-     * You can call this method by passing the text and your Groq API key.
+     * Appelle l'API Groq pour détecter les données sensibles via LLM.
      */
     public String callGroqApi(String text, String apiKey) {
-        // Appeler POST https://api.groq.com/openai/v1/chat/completions
-        // avec le prompt : 'Analyse ce texte et détecte : clés API, emails, mots de passe, données RGPD. Réponds UNIQUEMENT en JSON : {detected: [{type, value, risk}]}'
-        // TODO: Implement HTTP Client call here
-        return "{}";
+        String url = "https://api.groq.com/openai/v1/chat/completions";
+        
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(apiKey);
+        
+        String systemPrompt = "Analyse ce texte et détecte : clés API, emails, mots de passe, données RGPD. Réponds UNIQUEMENT en JSON au format : {\"detected\": [{\"type\": \"string\", \"value\": \"string\", \"risk\": 1}]}";
+        
+        Map<String, Object> requestBody = Map.of(
+            "model", "llama3-8b-8192",
+            "messages", List.of(
+                Map.of("role", "system", "content", systemPrompt),
+                Map.of("role", "user", "content", text)
+            ),
+            "temperature", 0.0,
+            "response_format", Map.of("type", "json_object")
+        );
+        
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+        
+        try {
+            log.info("Appel à Groq API pour analyse de texte...");
+            Map<String, Object> response = restTemplate.postForObject(url, entity, Map.class);
+            
+            if (response != null && response.containsKey("choices")) {
+                List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
+                if (!choices.isEmpty()) {
+                    Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+                    if (message != null && message.containsKey("content")) {
+                        return (String) message.get("content");
+                    }
+                }
+            }
+            return "{}";
+        } catch (Exception e) {
+            log.error("Erreur lors de l'appel à l'API Groq: {}", e.getMessage());
+            return "{}";
+        }
     }
 
     private int getRiskLevel(SensitiveType type) {
