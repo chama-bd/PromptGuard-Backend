@@ -1,7 +1,7 @@
 package com.promptguard.api.controller;
 
 import com.promptguard.api.dto.DashboardStats;
-import com.promptguard.api.model.PromptLog;
+import com.promptguard.api.dto.PromptLogDto;
 import com.promptguard.api.service.DashboardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -18,7 +18,7 @@ public class DashboardController {
     private final DashboardService dashboardService;
 
     @GetMapping("/logs")
-    public ResponseEntity<List<PromptLog>> getLogs() {
+    public ResponseEntity<List<PromptLogDto>> getLogs() {
 
         return ResponseEntity.ok(dashboardService.getAllLogs());
     }

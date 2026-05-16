@@ -1,6 +1,7 @@
 package com.promptguard.api.service;
 
 import com.promptguard.api.dto.DashboardStats;
+import com.promptguard.api.dto.PromptLogDto;
 import com.promptguard.api.model.PromptLog;
 import com.promptguard.api.model.Status;
 import com.promptguard.api.repository.PromptLogRepository;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -17,8 +19,24 @@ public class DashboardService {
 
     private final PromptLogRepository promptLogRepository;
 
-    public List<PromptLog> getAllLogs() {
-        return promptLogRepository.findAllByOrderByCreatedAtDesc();
+    public List<PromptLogDto> getAllLogs() {
+        return promptLogRepository.findAllByOrderByCreatedAtDesc().stream()
+                .map(this::mapToDto)
+                .collect(Collectors.toList());
+    }
+
+    private PromptLogDto mapToDto(PromptLog log) {
+        return PromptLogDto.builder()
+                .id(log.getId())
+                .promptId(log.getPrompt() != null ? log.getPrompt().getId() : null)
+                .employeeId(log.getEmployeeId())
+                .department(log.getDepartment())
+                .sanitizedPrompt(log.getSanitizedPrompt())
+                .riskExplanation(log.getRiskExplanation())
+                .status(log.getStatus())
+                .leakType(log.getLeakType())
+                .createdAt(log.getCreatedAt())
+                .build();
     }
 
     public DashboardStats getStats() {

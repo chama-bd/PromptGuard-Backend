@@ -48,7 +48,7 @@ public class AlertService {
                 .isGrouped(false)
                 .build();
 
-        Alert savedAlert = alertRepository.save(alert);
+        Alert savedAlert = alertRepository.saveAndFlush(alert);
         AlertDto alertDto = mapToDto(savedAlert);
 
         // Grouping logic: si 3 alertes mineures du même employé en 1h -> grouper
@@ -66,7 +66,7 @@ public class AlertService {
                         .isGrouped(true)
                         .build();
 
-                Alert savedGrouped = alertRepository.save(groupedAlert);
+                Alert savedGrouped = alertRepository.saveAndFlush(groupedAlert);
                 AlertDto groupedDto = mapToDto(savedGrouped);
                 
                 broadcast(groupedDto);
