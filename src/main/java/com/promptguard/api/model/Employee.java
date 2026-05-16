@@ -34,6 +34,10 @@ public class Employee {
     @Column(nullable = false)
     private String department;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Role role;
+
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;
