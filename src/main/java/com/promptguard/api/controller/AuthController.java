@@ -2,9 +2,7 @@ package com.promptguard.api.controller;
 
 import com.promptguard.api.dto.LoginRequest;
 import com.promptguard.api.dto.LoginResponse;
-import com.promptguard.api.dto.RegisterRequest;
 import com.promptguard.api.model.Employee;
-import com.promptguard.api.model.Role;
 import com.promptguard.api.repository.EmployeeRepository;
 import com.promptguard.api.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
@@ -39,36 +37,5 @@ public class AuthController {
         }
 
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-    }
-
-    @PostMapping("/register")
-    public ResponseEntity<LoginResponse> register(@RequestBody RegisterRequest request) {
-        if (employeeRepository.findByEmail(request.email()).isPresent()) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).build();
-        }
-
-        Employee employee = Employee.builder()
-                .name(request.name())
-                .email(request.email())
-                .password(passwordEncoder.encode(request.password()))
-                .department(request.department() != null ? request.department() : "Non défini")
-                .role(Role.ROLE_USER)
-                .build();
-
-        employee = employeeRepository.save(employee);
-
-        String token = jwtUtil.generateToken(
-                employee.getEmail(),
-                employee.getId().toString(),
-                employee.getDepartment(),
-                employee.getRole().name()
-        );
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(new LoginResponse(
-                token,
-                employee.getId(),
-                employee.getName(),
-                employee.getDepartment()
-        ));
     }
 }

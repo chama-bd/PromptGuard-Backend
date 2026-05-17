@@ -38,32 +38,15 @@ public class SecurityConfig {
             )
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
-                    "/api/auth/**",
-                    "/swagger-ui/**",
+                    "/api/auth/**", 
+                    "/swagger-ui/**", 
                     "/v3/api-docs/**",
-                    "/",
-                    "/index.html",
-                    "/assets/**",
-                    "/*.svg",
-                    "/*.ico",
-                    "/*.png",
-                    // React SPA routes - must serve index.html
-                    "/login",
-                    "/dashboard",
-                    "/alerts",
-                    "/heatmap",
-                    "/reports",
-                    "/employees",
-                    "/incidents",
-                    "/analytics",
-                    "/world-map",
-                    "/chat",
-                    "/messaging",
-                    "/planner",
-                    "/briefing",
-                    "/history",
-                    "/portfolio",
-                    "/profile"
+                    "/", 
+                    "/index.html", 
+                    "/assets/**", 
+                    "/*.svg", 
+                    "/*.ico", 
+                    "/*.png"
                 ).permitAll()
                 .requestMatchers("/api/admin/**").hasAuthority("ROLE_RSSI")
                 .requestMatchers("/api/rssi/**").hasAuthority("ROLE_RSSI")
