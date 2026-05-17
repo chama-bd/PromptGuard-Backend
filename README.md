@@ -1,6 +1,6 @@
 # SafeRaqib — PromptGuard
 
-SafeRaqib (également appelé **PromptGuard**) est une plateforme de sécurité SaaS d'entreprise de pointe conçue pour protéger les données confidentielles lors de l'utilisation d'assistants d'Intelligence Artificielle. Elle offre une alternative locale sécurisée aux solutions grand public (comme ChatGPT ou Claude) tout en analysant, filtrant, et contrôlant en temps réel les données exposées par les collaborateurs.
+SafeRaqib est une plateforme de sécurité SaaS d'entreprise de pointe conçue pour protéger les données confidentielles lors de l'utilisation d'assistants d'Intelligence Artificielle. Elle offre une alternative locale sécurisée aux solutions grand public (comme ChatGPT ou Claude) tout en analysant, filtrant, et contrôlant en temps réel les données exposées par les collaborateurs.
 
 ---
 
