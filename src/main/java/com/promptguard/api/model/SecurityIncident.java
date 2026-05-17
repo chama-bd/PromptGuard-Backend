@@ -28,11 +28,13 @@ public class SecurityIncident {
     @Column(nullable = false)
     private Integer riskScore;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String severity; // CRITICAL, HIGH, MEDIUM, LOW
+    private IncidentSeverity severity;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String actionTaken; // BLOCKED, ANONYMIZED, ALLOWED
+    private IncidentAction actionTaken;
 
     @Column(nullable = false)
     private String username;
@@ -45,6 +47,9 @@ public class SecurityIncident {
 
     @Column(columnDefinition = "TEXT")
     private String aiRecommendations;
+
+    @Column(columnDefinition = "TEXT")
+    private String forensicData;
 
     @CreationTimestamp
     @Column(updatable = false)

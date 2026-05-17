@@ -7,12 +7,17 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Repository
 public interface PromptLogRepository extends JpaRepository<PromptLog, UUID> {
 
-    List<PromptLog> findAllByOrderByCreatedAtDesc();
+    @Query("SELECT pl FROM PromptLog pl JOIN FETCH pl.prompt ORDER BY pl.createdAt DESC")
+    List<PromptLog> findAllWithPromptOrderByCreatedAtDesc();
+
+    @Query("SELECT pl FROM PromptLog pl JOIN FETCH pl.prompt WHERE pl.id = :id")
+    PromptLog findByIdWithPrompt(UUID id);
 
     long countByStatus(Status status);
 
@@ -22,4 +27,12 @@ public interface PromptLogRepository extends JpaRepository<PromptLog, UUID> {
 
     @Query("SELECT pl.department as department, COUNT(pl) FROM PromptLog pl WHERE pl.status = 'BLOCKED' OR pl.status = 'ANONYMIZED' GROUP BY pl.department")
     List<Object[]> getRiskIncidentsByDepartment();
+
+    @Query(value = "SELECT p.department AS department, " +
+            "FUNCTION('date', p.createdAt) AS logDate, " +
+            "COUNT(p.id) AS totalLogs, " +
+            "MAX(p.prompt.riskScore) AS maxRisk " +
+            "FROM PromptLog p " +
+            "GROUP BY p.department, FUNCTION('date', p.createdAt)")
+    List<Map<String, Object>> getHeatmapData();
 }
