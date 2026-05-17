@@ -37,7 +37,17 @@ public class SecurityConfig {
                 })
             )
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                .requestMatchers(
+                    "/api/auth/**", 
+                    "/swagger-ui/**", 
+                    "/v3/api-docs/**",
+                    "/", 
+                    "/index.html", 
+                    "/assets/**", 
+                    "/*.svg", 
+                    "/*.ico", 
+                    "/*.png"
+                ).permitAll()
                 .requestMatchers("/api/admin/**").hasAuthority("ROLE_RSSI")
                 .requestMatchers("/api/rssi/**").hasAuthority("ROLE_RSSI")
                 .anyRequest().authenticated()
