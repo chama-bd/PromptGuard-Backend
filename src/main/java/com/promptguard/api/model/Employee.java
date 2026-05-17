@@ -25,6 +25,9 @@ public class Employee {
     @Column(nullable = false)
     private String name;
 
+    @Column(name = "avatar_url")
+    private String avatarUrl;
+
     @Column(nullable = false, unique = true)
     private String email;
 
