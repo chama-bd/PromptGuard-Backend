@@ -26,8 +26,9 @@ public class DataInitializer implements CommandLineRunner {
     private final PasswordEncoder passwordEncoder;
 
     @Override
+
     public void run(String... args) {
-        if (employeeRepository.count() == 0) {
+        if (employeeRepository.findByEmail("alice@promptguard.local").isEmpty()) {
             String encodedPassword = passwordEncoder.encode("password123");
 
             Employee dev = Employee.builder()
