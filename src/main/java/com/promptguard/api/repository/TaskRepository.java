@@ -8,7 +8,8 @@ import java.util.List;
 import java.util.UUID;
 
 @Repository
-public interface TaskRepository extends JpaRepository<Task, UUID> {
-    // Cette méthode te permettra plus tard de récupérer uniquement les tâches d'un employé précis
+public interface TaskRepository extends JpaRepository<Task, Long> { // <-- On met Long ici !
+
+    // Spring Data comprend qu'il doit chercher l'attribut 'id' dans l'objet 'employee' de la Task
     List<Task> findByEmployeeId(UUID employeeId);
 }

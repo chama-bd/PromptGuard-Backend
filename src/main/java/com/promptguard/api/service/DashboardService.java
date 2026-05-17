@@ -1,11 +1,10 @@
 package com.promptguard.api.service;
 
-import com.promptguard.api.dto.DashboardStats;
-import com.promptguard.api.dto.DepartmentIncidentDTO; // <-- Pense à importer ton nouveau Record si tu l'as créé
-import com.promptguard.api.dto.EmployeeRiskProfileDTO;
-import com.promptguard.api.dto.PromptLogDto;
+import com.promptguard.api.dto.*;
+import com.promptguard.api.model.Employee;
 import com.promptguard.api.model.PromptLog;
 import com.promptguard.api.model.Status;
+import com.promptguard.api.repository.EmployeeRepository;
 import com.promptguard.api.repository.PromptLogRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,6 +20,7 @@ import java.util.stream.Collectors;
 public class DashboardService {
 
     private final PromptLogRepository promptLogRepository;
+    private final EmployeeRepository employeeRepository;
 
     public List<PromptLogDto> getAllLogs() {
         return promptLogRepository.findAllWithPromptOrderByCreatedAtDesc().stream()
@@ -103,6 +103,46 @@ public class DashboardService {
                 totalPrompts,
                 blockedPrompts,
                 Math.round(avgRisk * 100.0) / 100.0 // Arrondi à 2 décimales
+        );
+    }
+
+    public EmployeeProfileDTO getEmployeeProfile(UUID employeeId) {
+        // 1. On cherche l'employé dans la base de données
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new RuntimeException("Employé non trouvé avec l'id : " + employeeId));
+
+        // 2. Formule magique : On calcule son score de sécurité (sur 100)
+        // On récupère tous les logs de cet employé
+        List<PromptLog> employeeLogs = promptLogRepository.findByEmployeeId(employeeId.toString());
+
+        int initialScore = 100;
+
+        // Si l'employé a des logs, on fait baisser sa note en fonction de la gravité de ses actions
+        if (employeeLogs != null && !employeeLogs.isEmpty()) {
+            // Exemple : chaque prompt bloqué (incident) retire 8 points à sa note globale
+            long blockedPromptsCount = employeeLogs.stream()
+                    .filter(log -> "BLOCKED".equalsIgnoreCase(log.getStatus().name()))
+                    .count();
+
+            initialScore = initialScore - (int)(blockedPromptsCount * 8);
+
+            // On s'assure que le score ne descende jamais en dessous de 0
+            if (initialScore < 0) {
+                initialScore = 0;
+            }
+        }
+// On vérifie si l'avatar existe, sinon on génère un avatar par défaut avec le nom
+        String photo = (employee.getAvatarUrl() != null) ? employee.getAvatarUrl() :
+                "https://ui-avatars.com/api/?name=" + employee.getName().replace(" ", "+") + "&background=random";
+        return new EmployeeProfileDTO(
+                employee.getId(),
+                employee.getName(),              // Tu as un champ "name" global (ex: "Alex Lao")
+                employee.getEmail(),
+                employee.getRole().name(),       // Ton rôle est une Enum, on extrait son texte (.name())
+                employee.getDepartment(),
+                initialScore,                    // Notre score calculé dynamiquement
+                employee.getCreatedAt(),        // Tu as "createdAt", on l'utilise à la place de lastLogin
+                photo
         );
     }
 }

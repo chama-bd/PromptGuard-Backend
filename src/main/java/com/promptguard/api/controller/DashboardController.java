@@ -1,15 +1,13 @@
 package com.promptguard.api.controller;
 
-import com.promptguard.api.dto.DashboardStats;
-import com.promptguard.api.dto.DepartmentIncidentDTO; // <-- N'oublie pas d'importer ton Record si ce n'est pas automatique
-import com.promptguard.api.dto.EmployeeRiskProfileDTO;
-import com.promptguard.api.dto.PromptLogDto;
+import com.promptguard.api.dto.*;
 import com.promptguard.api.service.DashboardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/dashboard")
@@ -41,5 +39,13 @@ public class DashboardController {
     @GetMapping("/employees/{id}/surveillance")
     public ResponseEntity<EmployeeRiskProfileDTO> getEmployeeSurveillance(@PathVariable String id) {
         return ResponseEntity.ok(dashboardService.getEmployeeRiskProfile(id));
+    }
+    @GetMapping("/employees/{id}/profile")
+    public ResponseEntity<EmployeeProfileDTO> getEmployeeProfile(@PathVariable UUID id) {
+        // On appelle la logique qu'on vient de coder dans le service
+        EmployeeProfileDTO profile = dashboardService.getEmployeeProfile(id);
+
+        // On renvoie le résultat au Front-end avec un statut HTTP 200 OK
+        return ResponseEntity.ok(profile);
     }
 }

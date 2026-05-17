@@ -1,8 +1,12 @@
 package com.promptguard.api.model;
 
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
+import lombok.Getter;
+import lombok.Setter;
 
+import java.time.LocalDateTime;
+@Getter
+@Setter
 @Entity
 @Table(name = "tasks")
 public class Task {
@@ -14,11 +18,11 @@ public class Task {
     private String description;
     private LocalDateTime deadline;
     private String priority; // HIGH, MEDIUM, LOW
-    private boolean completed;
 
+    @Enumerated(EnumType.STRING)
+    private TaskStatus status = TaskStatus.TO_DO; // Par défaut à la création
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employee_id", nullable = false)
     private Employee employee;
 
-    // Ajoute tes Getters, Setters et Constructeurs ici !
 }

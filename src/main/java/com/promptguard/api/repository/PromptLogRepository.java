@@ -35,4 +35,5 @@ public interface PromptLogRepository extends JpaRepository<PromptLog, UUID> {
             "FROM PromptLog p " +
             "GROUP BY p.department, FUNCTION('date', p.createdAt)")
     List<Map<String, Object>> getHeatmapData();
-}
+
+    List<PromptLog> findByEmployeeId(String employeeId);}
