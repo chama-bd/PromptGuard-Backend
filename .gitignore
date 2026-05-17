@@ -1,0 +1,11 @@
+# Root level exclusions
+target/
+back/target/
+front/node_modules/
+front/dist/
+.idea/
+.vscode/
+*.log
+front/.env*
+front/node_modules
+front/dist
