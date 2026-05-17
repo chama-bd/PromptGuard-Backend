@@ -21,6 +21,9 @@ public class Task {
 
     @Enumerated(EnumType.STRING)
     private TaskStatus status = TaskStatus.TO_DO; // Par défaut à la création
+
+    private Boolean completed = false;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employee_id", nullable = false)
     private Employee employee;

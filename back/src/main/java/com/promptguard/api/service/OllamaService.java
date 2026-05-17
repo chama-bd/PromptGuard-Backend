@@ -23,6 +23,7 @@ import java.net.http.HttpResponse;
 public class OllamaService {
 
     private final RestTemplate restTemplate = new RestTemplate();
+    private final AiChatService aiChatService;
 
     @Value("${ollama.url:http://localhost:11434}")
     private String ollamaUrl;
@@ -66,9 +67,10 @@ public class OllamaService {
     /**
      * Génère une réponse via l'API locale Ollama en temps réel (SSE streaming).
      * @param prompt La requête textuelle à envoyer au modèle.
+     * @param sessionId L'identifiant optionnel de la session de chat.
      * @param emitter Le SseEmitter pour envoyer les chunks au client.
      */
-    public void streamResponse(String prompt, SseEmitter emitter) {
+    public void streamResponse(String prompt, Long sessionId, SseEmitter emitter) {
         new Thread(() -> {
             try {
                 ObjectMapper mapper = new ObjectMapper();
@@ -85,25 +87,55 @@ public class OllamaService {
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .build();
 
+                StringBuilder accumulatedResponse = new StringBuilder();
+                java.util.concurrent.atomic.AtomicBoolean isDisconnected = new java.util.concurrent.atomic.AtomicBoolean(false);
+
                 client.sendAsync(request, HttpResponse.BodyHandlers.ofLines())
                     .thenAccept(response -> {
                         response.body().forEach(line -> {
+                            if (isDisconnected.get()) {
+                                return;
+                            }
                             try {
                                 if (line != null && !line.isBlank()) {
                                     Map<String, Object> json = mapper.readValue(line, Map.class);
                                     if (json.containsKey("response")) {
-                                        emitter.send(SseEmitter.event().data(json.get("response")));
+                                        String token = (String) json.get("response");
+                                        accumulatedResponse.append(token);
+                                        try {
+                                            emitter.send(SseEmitter.event().data(token));
+                                        } catch (Exception e) {
+                                            log.warn("Client déconnecté (Génération stoppée). Arrêt immédiat du flux Ollama.");
+                                            isDisconnected.set(true);
+                                            try {
+                                                response.body().close();
+                                            } catch (Exception closeEx) {
+                                                // Ignore
+                                            }
+                                            return;
+                                        }
                                     }
                                     if (Boolean.TRUE.equals(json.get("done"))) {
+                                        if (sessionId != null) {
+                                            try {
+                                                aiChatService.saveMessages(sessionId, prompt, accumulatedResponse.toString());
+                                            } catch (Exception e) {
+                                                log.error("Erreur lors de l'enregistrement en BDD pour la session {}: {}", sessionId, e.getMessage());
+                                            }
+                                        }
                                         emitter.complete();
                                     }
                                 }
                             } catch (Exception e) {
-                                log.error("Erreur parsing ligne Ollama: {}", e.getMessage());
+                                if (!isDisconnected.get()) {
+                                    log.error("Erreur parsing ligne Ollama: {}", e.getMessage());
+                                }
                             }
                         });
                     }).exceptionally(ex -> {
-                        emitter.completeWithError(ex);
+                        if (!isDisconnected.get()) {
+                            emitter.completeWithError(ex);
+                        }
                         return null;
                     });
             } catch (Exception e) {

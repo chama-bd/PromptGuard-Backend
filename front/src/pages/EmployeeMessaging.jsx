@@ -23,22 +23,76 @@ import {
   ShieldCheck,
   SearchIcon,
   Bell,
-  Sparkles
+  Sparkles,
+  AlertTriangle
 } from 'lucide-react';
+import api from '../services/api';
 
 const containerVariants = {
   hidden: { opacity: 0 },
   show: { opacity: 1, transition: { staggerChildren: 0.1 } }
 };
 
-const channels = [];
-const messages = [];
+const formatTime = (ts) => {
+  if (!ts) return '';
+  try {
+    if (Array.isArray(ts)) {
+      const hour = String(ts[3] || 0).padStart(2, '0');
+      const minute = String(ts[4] || 0).padStart(2, '0');
+      return `${hour}:${minute}`;
+    }
+    const d = new Date(ts);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch (e) {
+    return '';
+  }
+};
 
 export default function EmployeeMessaging() {
+  const [channels, setChannels] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [activeChannel, setActiveChannel] = useState(null);
   const [inputText, setInputText] = useState('');
   const [showSecurityWarning, setShowSecurityWarning] = useState(false);
-  const [activeChannel, setActiveChannel] = useState(2);
+  const [securityReason, setSecurityReason] = useState('');
+  const [loading, setLoading] = useState(true);
   const chatContainerRef = useRef(null);
+
+  // Fetch channels on mount
+  useEffect(() => {
+    const fetchChannels = async () => {
+      try {
+        const response = await api.get('/api/messages/channels');
+        setChannels(response.data);
+        if (response.data.length > 0) {
+          const secCh = response.data.find(ch => ch.name === 'security-alerts');
+          setActiveChannel(secCh ? secCh.id : response.data[0].id);
+        }
+      } catch (err) {
+        console.error("Error fetching channels:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchChannels();
+  }, []);
+
+  // Fetch messages with polling every 4 seconds
+  useEffect(() => {
+    if (!activeChannel) return;
+    const fetchMessages = async () => {
+      try {
+        const response = await api.get(`/api/messages/channels/${activeChannel}/messages`);
+        setMessages(response.data);
+      } catch (err) {
+        console.error("Error fetching messages:", err);
+      }
+    };
+    fetchMessages();
+
+    const interval = setInterval(fetchMessages, 4000);
+    return () => clearInterval(interval);
+  }, [activeChannel]);
 
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -47,14 +101,49 @@ export default function EmployeeMessaging() {
   }, [messages]);
 
   const handleInput = (e) => {
-    const val = e.target.value;
-    setInputText(val);
+    setInputText(e.target.value);
+  };
+
+  const handleCensure = () => {
+    let cleanText = inputText;
+    // Replace typical API keys or passwords
+    cleanText = cleanText.replace(/sk-[a-zA-Z0-9]{20,}/g, '[CLÉ API CENSURÉE]');
+    cleanText = cleanText.replace(/password\s*=\s*[^\s]+/gi, 'password = [CENSURÉ]');
+    cleanText = cleanText.replace(/aws_[a-zA-Z0-9_]+/gi, '[SECRET AWS CENSURÉ]');
     
-    // Non-aggressive real-time detection simulation
-    if (val.toLowerCase().includes('sk-') || val.toLowerCase().includes('password')) {
-      setShowSecurityWarning(true);
-    } else {
+    setInputText(cleanText);
+    setShowSecurityWarning(false);
+  };
+
+  const handleSendMessage = async () => {
+    if (!inputText.trim() || !activeChannel) return;
+
+    const userName = localStorage.getItem('userName') || 'Utilisateur';
+    const userDept = localStorage.getItem('userDept') || 'IT_DEV';
+    const userRole = localStorage.getItem('userRole') || 'employee';
+
+    try {
+      const response = await api.post(`/api/messages/channels/${activeChannel}/messages`, {
+        content: inputText,
+        sender: userName,
+        senderRole: userDept,
+        senderAvatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=50CD89&color=fff&bold=true`
+      });
+
+      if (!response.data.success && response.data.warning) {
+        // Blocked by backend PromptGuard!
+        setSecurityReason(response.data.reason || "Détection de données confidentielles");
+        setInputText('');
+        setTimeout(() => setShowSecurityWarning(true), 100);
+        return;
+      }
+
+      // Success! Update list, reset input and warning
+      setMessages(prev => [...prev, response.data.message]);
+      setInputText('');
       setShowSecurityWarning(false);
+    } catch (err) {
+      console.error("Error sending message:", err);
     }
   };
 
@@ -96,26 +185,25 @@ export default function EmployeeMessaging() {
               <Plus size={16} className="text-[#A1A5B7] cursor-pointer hover:text-[#181C32]" />
             </div>
             <div className="flex flex-col gap-1.5">
-              {channels.map(ch => (
-                <motion.div 
-                  key={ch.id} 
-                  whileHover={{ x: 5 }}
-                  onClick={() => setActiveChannel(ch.id)}
-                  className={`flex items-center justify-between px-4 py-3 rounded-[16px] cursor-pointer group transition-all relative
-                    ${activeChannel === ch.id ? 'bg-[#181C32] text-white shadow-xl shadow-[#181C32]/20' : 'text-[#5E6278] hover:bg-[#F9FAFB]'}
-                  `}
-                >
-                  <div className="flex items-center gap-4">
-                    {ch.type === 'protected' ? <ShieldCheck size={16} className={activeChannel === ch.id ? 'text-[#009EF7]' : 'text-[#50CD89]'} /> : <Hash size={16} className="opacity-50" />}
-                    <span className="text-[14px] font-bold">{ch.name}</span>
-                  </div>
-                  {ch.unread > 0 && (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${activeChannel === ch.id ? 'bg-[#009EF7] text-white' : 'bg-[#F1416C] text-white'}`}>
-                      {ch.unread}
-                    </span>
-                  )}
-                </motion.div>
-              ))}
+              {loading ? (
+                <div className="text-[12px] font-bold text-[#A1A5B7] px-4 py-2">Chargement des canaux...</div>
+              ) : (
+                channels.map(ch => (
+                  <motion.div 
+                    key={ch.id} 
+                    whileHover={{ x: 5 }}
+                    onClick={() => setActiveChannel(ch.id)}
+                    className={`flex items-center justify-between px-4 py-3 rounded-[16px] cursor-pointer group transition-all relative
+                      ${activeChannel === ch.id ? 'bg-[#181C32] text-white shadow-xl shadow-[#181C32]/20' : 'text-[#5E6278] hover:bg-[#F9FAFB]'}
+                    `}
+                  >
+                    <div className="flex items-center gap-4">
+                      {ch.type === 'protected' ? <ShieldCheck size={16} className={activeChannel === ch.id ? 'text-[#009EF7]' : 'text-[#50CD89]'} /> : <Hash size={16} className="opacity-50" />}
+                      <span className="text-[14px] font-bold">#{ch.name}</span>
+                    </div>
+                  </motion.div>
+                ))
+              )}
             </div>
           </div>
 
@@ -159,10 +247,18 @@ export default function EmployeeMessaging() {
             </div>
             <div className="flex flex-col">
               <div className="flex items-center gap-3">
-                 <h2 className="text-[20px] font-black text-[#181C32] tracking-tight">#security-alerts</h2>
-                 <span className="px-3 py-1 bg-[#E8FFF3] text-[#50CD89] text-[10px] font-black uppercase rounded-[8px] tracking-widest border border-[#50CD89]/20">Protégé</span>
+                 <h2 className="text-[20px] font-black text-[#181C32] tracking-tight">
+                   #{channels.find(c => c.id === activeChannel)?.name || 'general'}
+                 </h2>
+                 {channels.find(c => c.id === activeChannel)?.type === 'protected' && (
+                   <span className="px-3 py-1 bg-[#E8FFF3] text-[#50CD89] text-[10px] font-black uppercase rounded-[8px] tracking-widest border border-[#50CD89]/20">Protégé</span>
+                 )}
               </div>
-              <p className="text-[13px] text-[#A1A5B7] font-bold mt-0.5">Flux de surveillance des menaces haute-intelligence</p>
+              <p className="text-[13px] text-[#A1A5B7] font-bold mt-0.5">
+                {channels.find(c => c.id === activeChannel)?.type === 'protected' 
+                  ? 'Flux de surveillance des menaces haute-intelligence' 
+                  : 'Canal de discussion d\'équipe collaboratif'}
+              </p>
             </div>
           </div>
           
@@ -191,19 +287,19 @@ export default function EmployeeMessaging() {
               className={`flex gap-8 max-w-[900px] group ${msg.type === 'ai-insight' ? 'bg-gradient-to-tr from-[#F1FAFF] to-white p-8 rounded-[32px] border border-[#009EF7]/10 shadow-sm' : ''}`}
             >
               <div className="relative shrink-0">
-                <img src={msg.avatar} alt={msg.user} className="w-12 h-12 rounded-[18px] shadow-md border-2 border-white" />
+                <img src={msg.senderAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.sender || 'User')}`} alt={msg.sender} className="w-12 h-12 rounded-[18px] shadow-md border-2 border-white" />
                 <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-4 border-white ${msg.type === 'ai-insight' ? 'bg-[#009EF7]' : 'bg-[#50CD89]'}`}></div>
               </div>
               
               <div className="flex flex-col gap-3 flex-1">
                 <div className="flex items-center gap-3">
                   <span className={`text-[15px] font-black tracking-tight ${msg.type === 'ai-insight' ? 'text-[#009EF7]' : 'text-[#181C32]'}`}>
-                    {msg.user}
+                    {msg.sender}
                   </span>
                   <span className="px-2 py-0.5 rounded-[6px] bg-[#F5F8FA] text-[#A1A5B7] text-[10px] font-black uppercase tracking-tighter border border-[#E4E6EF]">
-                    {msg.role}
+                    {msg.senderRole}
                   </span>
-                  <span className="text-[11px] font-bold text-[#A1A5B7] ml-2">{msg.time}</span>
+                  <span className="text-[11px] font-bold text-[#A1A5B7] ml-2">{formatTime(msg.timestamp)}</span>
                 </div>
 
                 <div className="relative">
@@ -247,42 +343,95 @@ export default function EmployeeMessaging() {
         {/* Predictive & Secure Input Area */}
         <div className="p-10 bg-white border-t border-[#E4E6EF] relative z-20">
           
-          {/* Real-time Contextual Security Assistant */}
-          <AnimatePresence>
-            {showSecurityWarning && (
-              <motion.div 
-                initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 20, scale: 0.95 }}
-                className="absolute left-10 right-10 bottom-full mb-6 bg-[#181C32] rounded-[24px] p-8 shadow-2xl border border-white/10 flex items-start gap-8 overflow-hidden group"
-              >
-                <div className="absolute top-0 right-0 w-32 h-32 bg-[#F1416C]/10 rounded-full blur-[30px] group-hover:scale-150 transition-transform duration-700"></div>
-                <div className="w-16 h-16 bg-[#F1416C] rounded-[20px] flex items-center justify-center text-white shrink-0 shadow-lg shadow-[#F1416C]/30 animate-pulse">
-                   <ShieldAlert size={32} />
-                </div>
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center gap-4">
-                     <h4 className="text-[20px] font-black text-white tracking-tight">Alerte d'Intelligence de Sécurité</h4>
-                     <span className="px-3 py-1 bg-[#F1416C]/20 text-[#F1416C] text-[10px] font-black uppercase rounded-[6px] tracking-widest border border-[#F1416C]/20">CRITIQUE</span>
+      {/* Risk Detection Popup Modal (Polished) */}
+      <AnimatePresence>
+        {showSecurityWarning && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-[#181C32]/80 backdrop-blur-md p-6"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 30, opacity: 0, filter: 'blur(10px)' }}
+              animate={{ scale: 1, y: 0, opacity: 1, filter: 'blur(0px)' }}
+              exit={{ scale: 0.9, y: 30, opacity: 0, filter: 'blur(10px)' }}
+              transition={{ type: "spring", stiffness: 260, damping: 20 }}
+              className="bg-white rounded-[32px] w-full max-w-[550px] overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.5)] border border-[#F1416C]/30"
+            >
+              <div className="bg-gradient-to-br from-[#F1416C] to-[#E22E58] p-10 text-white flex items-center justify-center flex-col relative overflow-hidden text-center">
+                <motion.div 
+                  animate={{ scale: [1, 1.2, 1], rotate: [0, 5, -5, 0] }}
+                  transition={{ repeat: Infinity, duration: 2 }}
+                  className="mb-6 relative z-10 w-20 h-20 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-md border border-white/30"
+                >
+                  <AlertTriangle size={40} />
+                </motion.div>
+                <h2 className="text-[28px] font-black relative z-10 tracking-tight leading-tight">BLOCAGE DE SÉCURITÉ CRITIQUE</h2>
+                <p className="text-[16px] font-bold text-white/80 mt-2 relative z-10">Exportation de données sensibles détectée par PromptGuard</p>
+                <div className="absolute top-0 right-0 w-[200px] h-[200px] bg-white/10 rounded-full blur-[60px] translate-x-1/4 -translate-y-1/4"></div>
+              </div>
+              
+              <div className="p-10">
+                <div className="flex items-center justify-between mb-8 pb-8 border-b border-[#E4E6EF]">
+                  <span className="text-[14px] font-black text-[#A1A5B7] uppercase tracking-[0.2em]">Évaluation du Risque</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[42px] font-black text-[#F1416C] leading-none tracking-tighter">94.8</span>
+                    <span className="text-[18px] font-bold text-[#A1A5B7] mt-2">SCORE</span>
                   </div>
-                  <p className="text-[15px] text-gray-300 font-medium leading-relaxed max-w-[600px]">
-                    Alex, le contenu que vous rédigez contient des motifs correspondant à des **Clés API d'Entreprise**. Pour prévenir une violation potentielle du périmètre, ce message a été marqué contextuellement.
+                </div>
+
+                <div className="mb-10">
+                  <span className="text-[11px] font-black text-[#A1A5B7] uppercase tracking-widest block mb-4">MENACES IDENTIFIÉES</span>
+                  <div className="flex flex-wrap gap-3">
+                    {['Clé d\'Accès Cloud', 'Token d\'Authentification JWT', 'Identifiant Admin Interne'].map((t, i) => (
+                      <motion.div 
+                        initial={{ opacity: 0, x: -10 }} 
+                        animate={{ opacity: 1, x: 0 }} 
+                        transition={{ delay: 0.2 + (i * 0.1) }} 
+                        key={i} 
+                        className="px-4 py-2 bg-[#FFF5F8] border border-[#F1416C]/20 text-[#F1416C] text-[13px] font-black rounded-[12px] flex items-center gap-2"
+                      >
+                        <div className="w-1.5 h-1.5 rounded-full bg-[#F1416C]"></div>
+                        {t}
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-[#181C32] rounded-[20px] p-6 flex flex-col gap-2 mb-10 border border-white/10">
+                  <span className="text-[11px] font-black text-gray-500 uppercase tracking-widest">Action du Protocole</span>
+                  <p className="text-[14px] font-bold text-white leading-relaxed">
+                    Soumission du message **automatiquement interrompue**. Raison : {securityReason}. Chiffrement local déclenché.
                   </p>
-                  <div className="flex items-center gap-4 mt-2">
-                     <button className="px-6 py-2.5 bg-[#F1416C] text-white rounded-[14px] text-[13px] font-black hover:bg-[#d93a61] transition-all">Censurer Automatiquement</button>
-                     <button className="px-6 py-2.5 bg-white/10 text-white border border-white/20 rounded-[14px] text-[13px] font-black hover:bg-white/20 transition-all" onClick={() => setShowSecurityWarning(false)}>Ignorer l'Alerte</button>
-                  </div>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+
+                <motion.button 
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowSecurityWarning(false)}
+                  className="w-full py-5 bg-[#F5F8FA] hover:bg-[#E4E6EF] text-[#181C32] font-black rounded-[20px] transition-all text-[15px] uppercase tracking-widest"
+                >
+                  Confirmer la Conformité
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
           <div className="max-w-[1000px] mx-auto">
             <div className="bg-[#F5F8FA] rounded-[32px] p-2 border-2 border-transparent focus-within:bg-white focus-within:border-[#E4E6EF] focus-within:shadow-[0_20px_60px_rgba(0,0,0,0.08)] transition-all duration-500 relative">
               <textarea 
                 value={inputText}
                 onChange={handleInput}
-                placeholder="Message sécurisé vers #security-alerts..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                placeholder={`Message sécurisé vers #${channels.find(c => c.id === activeChannel)?.name || '...'}`}
                 className="w-full bg-transparent border-none focus:ring-0 px-8 py-6 text-[16px] font-bold text-[#181C32] placeholder-[#A1A5B7] resize-none h-[100px] custom-scrollbar"
               />
               <div className="flex items-center justify-between px-6 pb-4">
@@ -303,6 +452,7 @@ export default function EmployeeMessaging() {
                    <motion.button 
                     whileHover={{ scale: 1.05, boxShadow: "0 10px 30px rgba(0,158,247,0.3)" }}
                     whileTap={{ scale: 0.95 }}
+                    onClick={handleSendMessage}
                     className="w-16 h-16 bg-[#009EF7] rounded-[24px] flex items-center justify-center text-white shadow-xl shadow-[#009EF7]/20 transition-all group"
                    >
                     <Send size={28} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
