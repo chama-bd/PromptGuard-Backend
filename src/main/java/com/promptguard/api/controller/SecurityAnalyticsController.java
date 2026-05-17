@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/security")
@@ -25,5 +26,13 @@ public class SecurityAnalyticsController {
     @GetMapping("/analytics")
     public ResponseEntity<SecurityAnalyticsDto> getAnalytics() {
         return ResponseEntity.ok(securityIncidentService.getAnalytics());
+    }
+
+    @GetMapping("/analytics/advanced")
+    public ResponseEntity<Map<String, Object>> getAdvancedAnalytics() {
+        return ResponseEntity.ok(Map.of(
+            "trend", securityIncidentService.getIncidentsTrend(),
+            "topEndpoints", securityIncidentService.getTopVulnerableEndpoints()
+        ));
     }
 }

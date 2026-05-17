@@ -178,4 +178,28 @@ public class SecurityIncidentService {
         if (score >= 50) return IncidentSeverity.MEDIUM;
         return IncidentSeverity.LOW;
     }
+
+    @Transactional(readOnly = true)
+    public Map<String, Long> getIncidentsTrend() {
+        return securityIncidentRepository.findAll().stream()
+                .collect(Collectors.groupingBy(
+                        i -> i.getTimestamp().toLocalDate().toString(), 
+                        Collectors.counting()
+                ));
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Long> getTopVulnerableEndpoints() {
+        return securityIncidentRepository.findAll().stream()
+                .collect(Collectors.groupingBy(SecurityIncident::getEndpoint, Collectors.counting()))
+                .entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .limit(5)
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        Map.Entry::getValue,
+                        (e1, e2) -> e1,
+                        java.util.LinkedHashMap::new
+                ));
+    }
 }
