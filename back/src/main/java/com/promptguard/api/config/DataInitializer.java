@@ -28,44 +28,62 @@ public class DataInitializer implements CommandLineRunner {
     @Override
 
     public void run(String... args) {
-        if (employeeRepository.findByEmail("alice@promptguard.local").isEmpty()) {
-            String encodedPassword = passwordEncoder.encode("password123");
+        String encodedPassword = passwordEncoder.encode("password123");
 
-            Employee dev = Employee.builder()
-                    .name("Alice Dev")
-                    .email("alice@promptguard.local")
-                    .password(encodedPassword)
-                    .department("IT_DEV")
-                    .role(Role.ROLE_USER)
-                    .build();
+        Employee dev = employeeRepository.findByEmail("alice@promptguard.local")
+                .orElseGet(() -> {
+                    Employee e = Employee.builder()
+                            .name("Alice Dev")
+                            .email("alice@promptguard.local")
+                            .password(encodedPassword)
+                            .department("IT_DEV")
+                            .role(Role.ROLE_USER)
+                            .build();
+                    System.out.println("✅ Alice Dev account created");
+                    return employeeRepository.save(e);
+                });
 
-            Employee hr = Employee.builder()
-                    .name("Bob HR")
-                    .email("bob@promptguard.local")
-                    .password(encodedPassword)
-                    .department("HR")
-                    .role(Role.ROLE_USER)
-                    .build();
+        Employee hr = employeeRepository.findByEmail("bob@promptguard.local")
+                .orElseGet(() -> {
+                    Employee e = Employee.builder()
+                            .name("Bob HR")
+                            .email("bob@promptguard.local")
+                            .password(encodedPassword)
+                            .department("HR")
+                            .role(Role.ROLE_USER)
+                            .build();
+                    System.out.println("✅ Bob HR account created");
+                    return employeeRepository.save(e);
+                });
 
-            Employee legal = Employee.builder()
-                    .name("Charlie Legal")
-                    .email("charlie@promptguard.local")
-                    .password(encodedPassword)
-                    .department("LEGAL")
-                    .role(Role.ROLE_USER)
-                    .build();
+        Employee legal = employeeRepository.findByEmail("charlie@promptguard.local")
+                .orElseGet(() -> {
+                    Employee e = Employee.builder()
+                            .name("Charlie Legal")
+                            .email("charlie@promptguard.local")
+                            .password(encodedPassword)
+                            .department("LEGAL")
+                            .role(Role.ROLE_USER)
+                            .build();
+                    System.out.println("✅ Charlie Legal account created");
+                    return employeeRepository.save(e);
+                });
 
-            Employee rssi = Employee.builder()
-                    .name("Admin RSSI")
-                    .email("rssi@promptguard.enterprise")
-                    .password(encodedPassword)
-                    .department("SECURITY")
-                    .role(Role.ROLE_RSSI)
-                    .build();
+        Employee rssi = employeeRepository.findByEmail("rssi@promptguard.enterprise")
+                .orElseGet(() -> {
+                    Employee e = Employee.builder()
+                            .name("Admin RSSI")
+                            .email("rssi@promptguard.enterprise")
+                            .password(encodedPassword)
+                            .department("SECURITY")
+                            .role(Role.ROLE_RSSI)
+                            .build();
+                    System.out.println("✅ Admin RSSI account created (password: password123)");
+                    return employeeRepository.save(e);
+                });
 
-            employeeRepository.saveAll(List.of(dev, hr, legal, rssi));
-
-            // Seed projects for Alice Dev
+        // Seed projects for Alice Dev if none exist
+        if (projectRepository.count() == 0) {
             Project p1 = new Project();
             p1.setName("Sécurisation API Client");
             p1.setDescription("Mise en place de filtres anti-injection de prompts IA et détection automatique des données sensibles (RGPD).");
@@ -81,8 +99,11 @@ public class DataInitializer implements CommandLineRunner {
             p2.setEmployee(dev);
 
             projectRepository.saveAll(List.of(p1, p2));
+            System.out.println("✅ Default projects seeded for Alice Dev.");
+        }
 
-            // Seed tasks for Alice Dev
+        // Seed tasks for Alice Dev if none exist
+        if (taskRepository.count() == 0) {
             Task t1 = new Task();
             t1.setTitle("Configurer les regex de détection de clés API");
             t1.setDescription("Détection de tokens GitHub et AWS dans les requêtes");
@@ -108,11 +129,7 @@ public class DataInitializer implements CommandLineRunner {
             t3.setEmployee(dev);
 
             taskRepository.saveAll(List.of(t1, t2, t3));
-
-            System.out.println("✅ 4 Demo accounts created (password: password123)");
-            System.out.println("   - RSSI: rssi@promptguard.enterprise");
-            System.out.println("   - Users: alice, bob, charlie");
-            System.out.println("✅ Default projects and planner tasks seeded for Alice Dev.");
+            System.out.println("✅ Default planner tasks seeded for Alice Dev.");
         }
     }
 }
