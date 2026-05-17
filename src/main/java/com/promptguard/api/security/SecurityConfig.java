@@ -46,7 +46,12 @@ public class SecurityConfig {
                     "/assets/**", 
                     "/*.svg", 
                     "/*.ico", 
-                    "/*.png"
+                    "/*.png",
+                    "/api/detect",
+                    "/api/ollama/**",
+                    "/api/messages/**",
+                    "/api/security/**",
+                    "/api/mock/**"
                 ).permitAll()
                 .requestMatchers("/api/admin/**").hasAuthority("ROLE_RSSI")
                 .requestMatchers("/api/rssi/**").hasAuthority("ROLE_RSSI")
