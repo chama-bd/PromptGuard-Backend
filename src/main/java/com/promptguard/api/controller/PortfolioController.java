@@ -7,6 +7,7 @@ import com.lowagie.text.Font;
 import com.lowagie.text.Paragraph;
 import com.lowagie.text.pdf.PdfWriter;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,14 +15,11 @@ import java.io.IOException;
 import java.util.UUID;
 
 @RestController
+@RequiredArgsConstructor
 @RequestMapping("/api/portfolio")
 public class PortfolioController {
 
     private final PortfolioService portfolioService;
-
-    public PortfolioController(PortfolioService portfolioService) {
-        this.portfolioService = portfolioService;
-    }
 
     // 1. Endpoint pour que Doha affiche le Portfolio sur le Front-end
     @GetMapping("/{employeeId}")
