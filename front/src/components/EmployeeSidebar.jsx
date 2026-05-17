@@ -18,6 +18,9 @@ export default function EmployeeSidebar() {
     { path: '/profile', label: 'Profil', icon: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' }
   ];
 
+  const userName = localStorage.getItem('userName') || 'Utilisateur';
+  const userDept = localStorage.getItem('userDept') || 'IT_DEV';
+
   return (
     <div className="w-[260px] bg-white border-r border-[#E4E6EF] flex flex-col shrink-0 font-sans h-full shadow-[2px_0_10px_rgba(0,0,0,0.02)] relative z-20">
       {/* Logo Area */}
@@ -65,11 +68,11 @@ export default function EmployeeSidebar() {
       <div className="p-6 border-t border-[#E4E6EF] bg-[#F9FAFB]">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden border-2 border-white shadow-sm">
-            <img src="https://ui-avatars.com/api/?name=Alex+Lao&background=185FA5&color=fff" alt="User" />
+            <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=185FA5&color=fff`} alt="User" />
           </div>
           <div className="flex flex-col">
-            <span className="text-[13px] font-bold text-[#181C32]">Alex Lao</span>
-            <span className="text-[11px] font-medium text-[#A1A5B7]">Employé • DEV</span>
+            <span className="text-[13px] font-bold text-[#181C32]">{userName}</span>
+            <span className="text-[11px] font-medium text-[#A1A5B7]">Employé • {userDept}</span>
           </div>
         </div>
       </div>

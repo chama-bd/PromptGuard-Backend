@@ -5,9 +5,11 @@ import { Search, BarChart2, Grid, Moon, Sparkles, Bell } from 'lucide-react';
 export default function TopBar() {
   const navigate = useNavigate();
   const role = localStorage.getItem('userRole') || 'employee';
+  const userName = localStorage.getItem('userName') || (role === 'rssi' ? 'Administrateur SOC' : 'Utilisateur');
+  const userDept = localStorage.getItem('userDept') || (role === 'rssi' ? 'SECURITY' : 'IT_DEV');
 
   const handleLogout = () => {
-    localStorage.removeItem('userRole');
+    localStorage.clear();
     navigate('/login');
   };
 
@@ -63,12 +65,12 @@ export default function TopBar() {
           onClick={handleLogout}
         >
           <div className="flex flex-col items-end hidden sm:flex">
-             <span className="text-[12px] font-black text-[#181C32]">{role === 'rssi' ? 'Administrateur SOC' : 'Alex Lao'}</span>
-             <span className="text-[10px] font-bold text-[#50CD89] uppercase tracking-wider">{role === 'rssi' ? 'Commande Cyber' : 'Ingénieur Dev'}</span>
+             <span className="text-[12px] font-black text-[#181C32]">{userName}</span>
+             <span className="text-[10px] font-bold text-[#50CD89] uppercase tracking-wider">{userDept}</span>
           </div>
           <div className="w-[38px] h-[38px] rounded-[10px] bg-[#F5F8FA] flex items-center justify-center border border-[#E4E6EF] overflow-hidden shadow-sm group-hover:shadow-md transition-all">
             <img 
-              src={`https://ui-avatars.com/api/?name=${role === 'rssi' ? 'SOC+Admin' : 'Alex+Lao'}&background=${role === 'rssi' ? 'F1416C' : '185FA5'}&color=fff&bold=true`} 
+              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=${role === 'rssi' ? 'F1416C' : '181C32'}&color=fff&bold=true`} 
               alt="User" 
               className="w-full h-full object-cover" 
             />

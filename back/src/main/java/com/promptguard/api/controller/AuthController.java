@@ -32,7 +32,8 @@ public class AuthController {
                     token,
                     employee.getId(),
                     employee.getName(),
-                    employee.getDepartment()
+                    employee.getDepartment(),
+                    employee.getRole().name()
             ));
         }
 

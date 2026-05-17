@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ShieldAlert, Bell, Search, Filter, ShieldCheck, MoreVertical } from 'lucide-react';
-
-const initialAlertData = [];
+import api from '../services/api';
+import toast from 'react-hot-toast';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -19,7 +19,91 @@ const itemVariants = {
 
 export default function RssiAlerts() {
   const [alerts, setAlerts] = useState([]);
-  
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const mapIncident = (inc) => {
+    let icon = '🛡️';
+    if (inc.threatType?.toLowerCase().includes('leak') || inc.threatType?.toLowerCase().includes('data')) {
+      icon = '🔓';
+    } else if (inc.threatType?.toLowerCase().includes('injection') || inc.threatType?.toLowerCase().includes('prompt')) {
+      icon = '💉';
+    } else if (inc.threatType?.toLowerCase().includes('jailbreak')) {
+      icon = '💥';
+    }
+
+    return {
+      id: inc.id || Math.random().toString(),
+      type: inc.threatType || 'Violation de Politique',
+      severity: inc.severity === 'CRITICAL' ? 'Critical' : inc.severity === 'HIGH' ? 'High' : 'Medium',
+      emp: inc.username || 'Collaborateur Anonyme',
+      time: inc.timestamp ? new Date(inc.timestamp).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}) : 'Récemment',
+      score: inc.riskScore || 50,
+      status: (inc.actionTaken || 'bloqué').toLowerCase(),
+      icon: icon
+    };
+  };
+
+  useEffect(() => {
+    // 1. Fetch recent incidents via API
+    const fetchIncidents = async () => {
+      try {
+        const response = await api.get('/api/security/incidents');
+        const mapped = response.data.map(mapIncident);
+        setAlerts(mapped);
+      } catch (error) {
+        console.error("Error fetching incidents:", error);
+      }
+    };
+    fetchIncidents();
+
+    // 2. Open Server-Sent Events (SSE) stream for real-time alerts!
+    const eventSource = new EventSource('http://localhost:8080/api/alerts/live');
+    
+    eventSource.onmessage = (event) => {
+      try {
+        const liveIncident = JSON.parse(event.data);
+        const mappedLive = mapIncident(liveIncident);
+        setAlerts(prev => [mappedLive, ...prev]);
+        toast.error(`⚠️ SOC ALERT : ${mappedLive.type} détecté par ${mappedLive.emp} !`, {
+          duration: 6000,
+          position: 'top-right',
+          style: {
+            background: '#FFF5F8',
+            color: '#F1416C',
+            fontWeight: 'bold',
+            border: '1px solid #F1416C'
+          }
+        });
+      } catch (err) {
+        console.error("Error parsing live alert event:", err);
+      }
+    };
+
+    eventSource.onerror = (err) => {
+      console.warn("SSE connection error, closing or retrying...", err);
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, []);
+
+  const critCount = alerts.filter(a => a.severity === 'Critical').length;
+  const activeCount = alerts.filter(a => a.status === 'bloqué' || a.status === 'blocked').length;
+  const anonymizedCount = alerts.filter(a => a.status === 'anonymized' || a.status === 'anonymisé').length;
+
+  const statBoxes = [
+    { label: 'Alertes Critiques', val: critCount, color: '#F1416C', bg: '#FFF5F8' },
+    { label: 'Menaces Bloquées', val: activeCount, color: '#009EF7', bg: '#F1FAFF' },
+    { label: 'Anonymisations', val: anonymizedCount, color: '#7239EA', bg: '#F8F5FF' },
+    { label: 'Incidents Récents', val: alerts.length, color: '#50CD89', bg: '#E8FFF3' },
+  ];
+
+  const filteredAlerts = alerts.filter(a => 
+    a.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    a.emp.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <motion.div 
       variants={containerVariants}
@@ -44,6 +128,8 @@ export default function RssiAlerts() {
             <input 
               type="text" 
               placeholder="Rechercher des menaces..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="bg-white border border-[#E4E6EF] rounded-[8px] pl-10 pr-4 py-2.5 text-[13px] focus:outline-none focus:border-[#009EF7] transition-all w-[240px] shadow-sm"
             />
           </div>
@@ -55,12 +141,7 @@ export default function RssiAlerts() {
 
       {/* Alert Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-[20px]">
-        {[
-          { label: 'Alertes Critiques', val: 12, color: '#F1416C', bg: '#FFF5F8' },
-          { label: 'Menaces Actives', val: 4, color: '#009EF7', bg: '#F1FAFF' },
-          { label: 'Enquêtes', val: 8, color: '#7239EA', bg: '#F8F5FF' },
-          { label: 'Résolus (24h)', val: 146, color: '#50CD89', bg: '#E8FFF3' },
-        ].map((stat, idx) => (
+        {statBoxes.map((stat, idx) => (
           <motion.div 
             key={idx}
             variants={itemVariants}
@@ -89,69 +170,73 @@ export default function RssiAlerts() {
         </div>
         
         <div className="flex-1 overflow-y-auto">
-          {alerts.map((alert, idx) => (
-            <motion.div 
-              key={alert.id}
-              whileHover={{ backgroundColor: '#F9FAFB' }}
-              className={`px-8 py-6 flex items-center justify-between gap-6 transition-all border-b border-[#F1F1F4] cursor-pointer group ${alert.severity === 'Critical' ? 'relative' : ''}`}
-            >
-              {/* Glowing Indicator for Critical */}
-              {alert.severity === 'Critical' && (
-                <div className="absolute left-0 top-0 w-1 h-full bg-[#F1416C] shadow-[0_0_10px_#F1416C]"></div>
-              )}
+          {filteredAlerts.length === 0 ? (
+            <div className="text-center py-12 text-[#A1A5B7] font-bold">Aucune alerte de sécurité à afficher.</div>
+          ) : (
+            filteredAlerts.map((alert) => (
+              <motion.div 
+                key={alert.id}
+                whileHover={{ backgroundColor: '#F9FAFB' }}
+                className={`px-8 py-6 flex items-center justify-between gap-6 transition-all border-b border-[#F1F1F4] cursor-pointer group ${alert.severity === 'Critical' ? 'relative' : ''}`}
+              >
+                {/* Glowing Indicator for Critical */}
+                {alert.severity === 'Critical' && (
+                  <div className="absolute left-0 top-0 w-1 h-full bg-[#F1416C] shadow-[0_0_10px_#F1416C]"></div>
+                )}
 
-              <div className="flex items-center gap-6 flex-1">
-                <div className={`w-12 h-12 rounded-[12px] flex items-center justify-center text-[20px] shadow-sm
-                  ${alert.severity === 'Critical' ? 'bg-[#FFF5F8] border border-[#F1416C]/10' : 'bg-[#F1FAFF] border border-[#009EF7]/10'}`}
-                >
-                  {alert.icon}
-                </div>
-                
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-3">
-                    <h3 className="text-[14px] font-bold text-[#181C32]">{alert.type}</h3>
-                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-[4px] uppercase tracking-tighter
-                      ${alert.severity === 'Critical' ? 'bg-[#F1416C] text-white shadow-sm' : 
-                        alert.severity === 'High' ? 'bg-[#E88B11] text-white' : 
-                        'bg-[#F5F8FA] text-[#7E8299]'}`}
-                    >
-                      {alert.severity}
-                    </span>
+                <div className="flex items-center gap-6 flex-1">
+                  <div className={`w-12 h-12 rounded-[12px] flex items-center justify-center text-[20px] shadow-sm
+                    ${alert.severity === 'Critical' ? 'bg-[#FFF5F8] border border-[#F1416C]/10' : 'bg-[#F1FAFF] border border-[#009EF7]/10'}`}
+                  >
+                    {alert.icon}
                   </div>
-                  <div className="flex items-center gap-2 text-[12px] font-medium text-[#A1A5B7]">
-                    <span className="text-[#181C32] font-bold">{alert.emp}</span>
-                    <span>•</span>
-                    <span>{alert.time}</span>
+                  
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-[14px] font-bold text-[#181C32]">{alert.type}</h3>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-[4px] uppercase tracking-tighter
+                        ${alert.severity === 'Critical' ? 'bg-[#F1416C] text-white shadow-sm' : 
+                          alert.severity === 'High' ? 'bg-[#E88B11] text-white' : 
+                          'bg-[#F5F8FA] text-[#7E8299]'}`}
+                      >
+                        {alert.severity}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[12px] font-medium text-[#A1A5B7]">
+                      <span className="text-[#181C32] font-bold">{alert.emp}</span>
+                      <span>•</span>
+                      <span>{alert.time}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="flex items-center gap-12 shrink-0">
-                <div className="flex flex-col items-center">
-                  <span className="text-[10px] font-bold text-[#A1A5B7] uppercase mb-1">Score de Risque</span>
-                  <span className={`text-[15px] font-black ${alert.score > 90 ? 'text-[#F1416C]' : 'text-[#181C32]'}`}>{alert.score}</span>
-                </div>
-                
-                <div className="w-[100px] flex justify-center">
-                  {alert.status === 'bloqué' ? (
-                    <div className="flex items-center gap-1.5 text-[#F1416C] font-bold text-[12px]">
-                      <ShieldAlert size={14} /> BLOQUÉ
-                    </div>
-                  ) : alert.status === 'résolu' ? (
-                    <div className="flex items-center gap-1.5 text-[#50CD89] font-bold text-[12px]">
-                      <ShieldCheck size={14} /> RÉSOLU
-                    </div>
-                  ) : (
-                    <div className="text-[#A1A5B7] font-bold text-[12px] uppercase">{alert.status}</div>
-                  )}
-                </div>
+                <div className="flex items-center gap-12 shrink-0">
+                  <div className="flex flex-col items-center">
+                    <span className="text-[10px] font-bold text-[#A1A5B7] uppercase mb-1">Score de Risque</span>
+                    <span className={`text-[15px] font-black ${alert.score > 90 ? 'text-[#F1416C]' : 'text-[#181C32]'}`}>{alert.score}</span>
+                  </div>
+                  
+                  <div className="w-[100px] flex justify-center">
+                    {alert.status === 'bloqué' || alert.status === 'blocked' ? (
+                      <div className="flex items-center gap-1.5 text-[#F1416C] font-bold text-[12px]">
+                        <ShieldAlert size={14} /> BLOQUÉ
+                      </div>
+                    ) : alert.status === 'résolu' || alert.status === 'anonymized' || alert.status === 'anonymisé' ? (
+                      <div className="flex items-center gap-1.5 text-[#50CD89] font-bold text-[12px]">
+                        <ShieldCheck size={14} /> SÉCURISÉ
+                      </div>
+                    ) : (
+                      <div className="text-[#A1A5B7] font-bold text-[12px] uppercase">{alert.status}</div>
+                    )}
+                  </div>
 
-                <button className="text-[#A1A5B7] hover:text-[#009EF7] transition-colors p-1">
-                  <MoreVertical size={18} />
-                </button>
-              </div>
-            </motion.div>
-          ))}
+                  <button className="text-[#A1A5B7] hover:text-[#009EF7] transition-colors p-1">
+                    <MoreVertical size={18} />
+                  </button>
+                </div>
+              </motion.div>
+            ))
+          )}
         </div>
       </motion.div>
     </motion.div>

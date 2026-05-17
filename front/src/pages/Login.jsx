@@ -1,20 +1,42 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import api from '../services/api';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('API Call: Login with', { email, password });
-    // TODO: Call your Spring Boot Login Endpoint here
-    // For now, redirecting based on hardcoded demo role logic is removed.
-    // Assuming a successful login sets role from backend:
-    // localStorage.setItem('userRole', fetchedRole);
-    // navigate(fetchedRole === 'rssi' ? '/dashboard' : '/chat');
+    setError('');
+    setLoading(true);
+    try {
+      const response = await api.post('/api/auth/login', { email, password });
+      const { token, employeeId, name, department, role } = response.data;
+      
+      localStorage.setItem('token', token);
+      localStorage.setItem('userId', employeeId);
+      localStorage.setItem('userName', name);
+      localStorage.setItem('userDept', department);
+      
+      const mappedRole = role === 'ROLE_RSSI' ? 'rssi' : 'employee';
+      localStorage.setItem('userRole', mappedRole);
+      
+      if (mappedRole === 'rssi') {
+        navigate('/dashboard');
+      } else {
+        navigate('/chat');
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      setError(err.response?.status === 401 ? 'Email ou mot de passe incorrect.' : 'Impossible de se connecter au serveur.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -82,6 +104,16 @@ export default function Login() {
             className="flex flex-col gap-4"
             onSubmit={handleSubmit}
           >
+            {error && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-[#FFF5F8] border border-[#F1416C]/20 text-[#F1416C] text-[13px] font-bold px-4 py-3 rounded-[8px] text-center"
+              >
+                {error}
+              </motion.div>
+            )}
+
             <div>
               <label className="block text-[13px] font-semibold text-slate-600 mb-2">Email</label>
               <input
@@ -124,9 +156,10 @@ export default function Login() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               type="submit"
-              className="w-full py-3.5 rounded-[8px] bg-gradient-to-r from-[#1E3A8A] to-[#1D4ED8] text-white text-[15px] font-bold mt-2 shadow-[0_10px_30px_rgba(30,58,138,0.25)] transition-all"
+              disabled={loading}
+              className="w-full py-3.5 rounded-[8px] bg-gradient-to-r from-[#1E3A8A] to-[#1D4ED8] text-white text-[15px] font-bold mt-2 shadow-[0_10px_30px_rgba(30,58,138,0.25)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Se connecter
+              {loading ? 'Connexion en cours...' : 'Se connecter'}
             </motion.button>
           </motion.form>
         </div>

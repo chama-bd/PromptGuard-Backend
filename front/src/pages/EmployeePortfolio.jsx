@@ -76,6 +76,12 @@ export default function EmployeePortfolio() {
     );
   };
 
+  const handleExportPDF = () => {
+    const userId = localStorage.getItem('userId');
+    if (!userId) return;
+    window.open(`http://localhost:8080/api/portfolio/${userId}/export`, '_blank');
+  };
+
   return (
     <motion.div 
       variants={containerVariants}
@@ -119,7 +125,10 @@ export default function EmployeePortfolio() {
           </div>
         </div>
 
-        <button className="px-6 py-3 bg-[#181C32] hover:bg-[#2b304d] text-white rounded-[12px] font-black text-[13px] flex items-center gap-2 transition-all shadow-sm shrink-0 border border-[#181C32]/10">
+        <button 
+          onClick={handleExportPDF}
+          className="px-6 py-3 bg-[#181C32] hover:bg-[#2b304d] text-white rounded-[12px] font-black text-[13px] flex items-center gap-2 transition-all shadow-sm shrink-0 border border-[#181C32]/10"
+        >
           <Download size={16} /> Exporter Portfolio PDF
         </button>
       </motion.div>

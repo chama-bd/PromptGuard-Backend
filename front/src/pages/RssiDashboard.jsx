@@ -5,17 +5,21 @@ import {
   CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
 import { ArrowRight, Cloud, Bitcoin, Share2, Smartphone, Monitor, Shield, Zap, TrendingUp, AlertCircle, Plus } from 'lucide-react';
+import api from '../services/api';
 
 const AnimatedCounter = ({ value, duration = 2, decimals = 0, prefix = '', suffix = '' }) => {
   const [count, setCount] = useState(0);
   
   useEffect(() => {
     let start = 0;
-    const end = parseFloat(value);
-    if (start === end) return;
+    const end = parseFloat(value) || 0;
+    if (start === end) {
+      setCount(end);
+      return;
+    }
     
     let totalMiliseconds = duration * 1000;
-    let incrementTime = (totalMiliseconds / end) * (decimals === 0 ? 1 : 10);
+    let incrementTime = (totalMiliseconds / Math.max(end, 1)) * (decimals === 0 ? 1 : 10);
     
     let timer = setInterval(() => {
       start += decimals === 0 ? 1 : 0.1;
@@ -32,13 +36,6 @@ const AnimatedCounter = ({ value, duration = 2, decimals = 0, prefix = '', suffi
   return <span>{prefix}{decimals === 0 ? Math.floor(count) : count.toFixed(decimals)}{suffix}</span>;
 };
 
-const donutData = [];
-const sparkline1 = [];
-const sparkline2 = [];
-const sparkline3 = [];
-const areaData = [];
-const scatterData = [];
-
 const containerVariants = {
   hidden: { opacity: 0 },
   show: {
@@ -53,6 +50,83 @@ const itemVariants = {
 };
 
 export default function RssiDashboard() {
+  const [stats, setStats] = useState({
+    totalPrompts: 0,
+    blockedPrompts: 0,
+    anonymizedPrompts: 0,
+    averageRiskScore: 0.0,
+    incidentsByDepartment: {}
+  });
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const statsRes = await api.get('/api/dashboard/stats');
+        setStats(statsRes.data);
+
+        const logsRes = await api.get('/api/dashboard/logs');
+        setLogs(logsRes.data);
+      } catch (error) {
+        console.error("Error loading RSSI dashboard:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboardData();
+  }, []);
+
+  const safeTotal = stats.totalPrompts || 1;
+  const safeAnonymized = stats.anonymizedPrompts || 0;
+  const safeBlocked = stats.blockedPrompts || 0;
+  const safeSecure = Math.max(0, safeTotal - safeAnonymized - safeBlocked);
+
+  const donutData = [
+    { name: 'Anonymisés', value: safeAnonymized, color: '#50CD89' },
+    { name: 'Bloqués', value: safeBlocked, color: '#F1416C' },
+    { name: 'Sûrs', value: safeSecure, color: '#009EF7' }
+  ];
+
+  const sparkline1 = [{ v: 40 }, { v: 60 }, { v: 45 }, { v: 90 }, { v: 75 }];
+  const sparkline2 = [{ v: 30 }, { v: 45 }, { v: 35 }, { v: 65 }, { v: 50 }];
+  const sparkline3 = [{ v: 50 }, { v: 80 }, { v: 65 }, { v: 95 }, { v: 85 }];
+
+  const areaData = logs.slice(0, 10).map((log, idx) => ({
+    name: log.createdAt ? new Date(log.createdAt).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}) : `Log ${idx}`,
+    v1: log.status === 'BLOCKED' ? 100 : log.status === 'ANONYMIZED' ? 70 : 40,
+    v2: log.leakType ? 85 : 30
+  })).reverse();
+
+  if (areaData.length === 0) {
+    areaData.push(
+      { name: '10:00', v1: 60, v2: 40 },
+      { name: '11:00', v1: 80, v2: 50 },
+      { name: '12:00', v1: 45, v2: 70 },
+      { name: '13:00', v1: 95, v2: 60 }
+    );
+  }
+
+  const scatterData = logs.map((log, idx) => ({
+    x: idx * 45 + 120,
+    y: log.status === 'BLOCKED' ? 620 : log.status === 'ANONYMIZED' ? 380 : 160,
+    color: log.status === 'BLOCKED' ? '#F1416C' : log.status === 'ANONYMIZED' ? '#7239EA' : '#50CD89'
+  })).slice(0, 15);
+
+  if (scatterData.length === 0) {
+    scatterData.push(
+      { x: 100, y: 200, color: '#50CD89' },
+      { x: 300, y: 600, color: '#F1416C' },
+      { x: 500, y: 400, color: '#FFC700' }
+    );
+  }
+
+  const threatLevel = safeBlocked > 5 ? { label: 'Critique', color: '#F1416C' } :
+                      safeBlocked > 1 ? { label: 'Élevé', color: '#FFC700' } :
+                      { label: 'Stable', color: '#50CD89' };
+
+  const healthScore = Math.max(50, 100 - (safeBlocked * 10));
+
   return (
     <motion.div 
       variants={containerVariants}
@@ -81,7 +155,7 @@ export default function RssiDashboard() {
             whileHover={{ y: -2, backgroundColor: '#F9FAFB' }} 
             className="bg-white border border-[#E4E6EF] text-[#7E8299] text-[13px] font-bold px-5 py-3 rounded-[14px] cursor-pointer shadow-sm hover:border-[#009EF7]/30 transition-all flex items-center gap-2"
           >
-            Niveau de Menace : <span className="text-[#50CD89]">Stable</span>
+            Niveau de Menace : <span style={{ color: threatLevel.color }}>{threatLevel.label}</span>
           </motion.div>
           <motion.button 
             whileHover={{ scale: 1.05, y: -2 }} 
@@ -116,23 +190,23 @@ export default function RssiDashboard() {
                  <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-white backdrop-blur-md">
                     <Zap size={16} fill="currentColor" />
                  </div>
-                 <span className="text-[12px] font-black text-white/80 uppercase tracking-widest">Sondes Actives</span>
+                 <span className="text-[12px] font-black text-white/80 uppercase tracking-widest">Total des Prompts</span>
               </div>
               <h2 className="text-[48px] font-black text-white leading-none mb-2 tracking-tighter">
-                <AnimatedCounter value="69" />
+                <AnimatedCounter value={stats.totalPrompts} />
               </h2>
-              <p className="text-[14px] font-bold text-white/70">Surveillance de sécurité active mondialement</p>
+              <p className="text-[14px] font-bold text-white/70">Flux total de prompts analysés par le proxy</p>
             </div>
             
             <div className="relative z-10 w-full mt-auto">
               <div className="flex items-center justify-between text-white text-[13px] font-black mb-3">
                 <span>Santé de l'Infrastructure</span>
-                <span className="bg-white/20 px-2 py-0.5 rounded-[6px]">94%</span>
+                <span className="bg-white/20 px-2 py-0.5 rounded-[6px]">{healthScore}%</span>
               </div>
               <div className="w-full h-[8px] bg-white/20 rounded-full overflow-hidden">
                 <motion.div 
                   initial={{ width: 0 }}
-                  animate={{ width: '94%' }}
+                  animate={{ width: `${healthScore}%` }}
                   transition={{ duration: 1.5, delay: 0.5, ease: "circOut" }}
                   className="h-full bg-white rounded-full relative"
                 >
@@ -192,13 +266,13 @@ export default function RssiDashboard() {
 
             <div className="flex items-center gap-4 mb-2 relative z-10">
               <h2 className="text-[32px] font-black text-[#181C32] tracking-tighter leading-none">
-                <AnimatedCounter value="69700" prefix="$" />
+                <AnimatedCounter value={stats.anonymizedPrompts} />
               </h2>
               <span className="text-[11px] font-black text-[#50CD89] bg-[#E8FFF3] px-2.5 py-1 rounded-[8px] flex items-center gap-1">
-                <TrendingUp size={12} /> +2.2%
+                <TrendingUp size={12} /> +{Math.max(1, Math.floor(stats.averageRiskScore * 10) / 10)}%
               </span>
             </div>
-            <p className="text-[13px] font-bold text-[#A1A5B7] mb-8 relative z-10 uppercase tracking-wider">Capitalisation de l'Efficacité</p>
+            <p className="text-[13px] font-bold text-[#A1A5B7] mb-8 relative z-10 uppercase tracking-wider">Prompts Anonymisés</p>
             
             <div className="flex items-center relative z-10 gap-8">
               <div className="w-[90px] h-[90px] shrink-0">
@@ -215,8 +289,9 @@ export default function RssiDashboard() {
               </div>
               <div className="flex-1 grid grid-cols-1 gap-3">
                 {[
-                  { label: 'Leaf CRM', value: '$7.6k', color: 'bg-[#009EF7]' },
-                  { label: 'Mivy App', value: '$2.8k', color: 'bg-[#50CD89]' },
+                  { label: 'Anonymisés', value: stats.anonymizedPrompts, color: 'bg-[#50CD89]' },
+                  { label: 'Bloqués', value: stats.blockedPrompts, color: 'bg-[#F1416C]' },
+                  { label: 'Sûrs', value: safeSecure, color: 'bg-[#009EF7]' }
                 ].map((item, idx) => (
                   <motion.div key={idx} whileHover={{ x: 5 }} className="flex items-center justify-between cursor-pointer group">
                     <div className="flex items-center gap-3">
@@ -239,14 +314,14 @@ export default function RssiDashboard() {
             <h3 className="text-[16px] font-black text-[#181C32] mb-6 uppercase tracking-wider">Audit de Performance</h3>
             <div className="flex flex-col gap-4">
               {[
-                { label: 'Note Moyenne Client', val: '7.8', total: '/10', icon: '↗', color: '#50CD89' },
-                { label: 'Hub d\'Interaction IA', val: '730', total: '', icon: '↘', color: '#F1416C' },
-                { label: 'Niveau de Sécurité', val: 'Or', total: '', icon: '↗', color: '#FFC700' }
+                { label: 'Score Moyen de Risque', val: `${(stats.averageRiskScore || 0).toFixed(1)}`, total: '%', icon: '↗', color: '#50CD89' },
+                { label: 'Total des Alertes', val: `${stats.blockedPrompts}`, total: '', icon: '↘', color: '#F1416C' },
+                { label: 'Statut Global Menaces', val: threatLevel.label, total: '', icon: '↗', color: threatLevel.color }
               ].map((item, idx) => (
                 <div key={idx} className="flex items-center justify-between">
                   <span className="text-[13px] font-bold text-[#A1A5B7]">{item.label}</span>
                   <div className="flex items-center gap-3">
-                    <span className={`text-[10px] font-black animate-pulse-soft`} style={{ color: item.color }}>{item.icon}</span>
+                    <span className={`text-[10px] font-black animate-pulse-soft`} style={{ color: item.color || '#181C32' }}>{item.icon}</span>
                     <span className="text-[14px] font-black text-[#181C32]">
                       {item.val}<span className="text-[#A1A5B7] font-bold text-[11px] ml-1">{item.total}</span>
                     </span>
@@ -264,8 +339,8 @@ export default function RssiDashboard() {
         >
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h3 className="text-[16px] font-black text-[#181C32] uppercase tracking-wider">Meilleurs Opérateurs</h3>
-              <p className="text-[12px] font-bold text-[#A1A5B7] mt-1">Moyenne 69.34% Efficacité</p>
+              <h3 className="text-[16px] font-black text-[#181C32] uppercase tracking-wider">Statut des Départements</h3>
+              <p className="text-[12px] font-bold text-[#A1A5B7] mt-1">Niveau d'exposition des entités</p>
             </div>
             <div className="w-10 h-10 bg-[#F5F8FA] rounded-[12px] flex items-center justify-center text-[#A1A5B7] group-hover:bg-[#009EF7] group-hover:text-white transition-all">
               <TrendingUp size={20} />
@@ -274,10 +349,10 @@ export default function RssiDashboard() {
 
           <div className="flex-1 flex flex-col gap-5">
             {[
-              { name: 'Guy Hawkins', loc: 'Haiti', rate: '78.34%', data: sparkline1, color: '#009EF7' },
-              { name: 'Jane Cooper', loc: 'Monaco', rate: '63.83%', data: sparkline2, color: '#50CD89' },
-              { name: 'Jacob Jones', loc: 'Pologne', rate: '92.56%', data: sparkline3, color: '#7239EA' },
-              { name: 'Cody Fishers', loc: 'Mexique', rate: '63.08%', data: sparkline2, color: '#F1416C' }
+              { name: 'Équipe IT / Devs', loc: 'Alice Dev', rate: `${stats.incidentsByDepartment?.['IT_DEV'] || 0} incidents`, data: sparkline1, color: '#009EF7' },
+              { name: 'Département RH', loc: 'Bob HR', rate: `${stats.incidentsByDepartment?.['HR'] || 0} incidents`, data: sparkline2, color: '#50CD89' },
+              { name: 'Service Juridique', loc: 'Charlie Legal', rate: `${stats.incidentsByDepartment?.['LEGAL'] || 0} incidents`, data: sparkline3, color: '#7239EA' },
+              { name: 'Administrateur RSSI', loc: 'Admin', rate: `${stats.incidentsByDepartment?.['RSSI'] || 0} incidents`, data: sparkline2, color: '#F1416C' }
             ].map((user, idx) => (
               <motion.div 
                 key={idx} 
@@ -304,7 +379,7 @@ export default function RssiDashboard() {
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
-                  <span className="text-[14px] font-black text-[#181C32]">{user.rate}</span>
+                  <span className="text-[13px] font-black text-[#181C32]">{user.rate}</span>
                 </div>
               </motion.div>
             ))}
@@ -379,7 +454,7 @@ export default function RssiDashboard() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F3F9" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#A1A5B7', fontSize: 11, fontWeight: 'bold' }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#A1A5B7', fontSize: 11, fontWeight: 'bold' }} domain={[30, 120]} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#A1A5B7', fontSize: 11, fontWeight: 'bold' }} domain={[0, 120]} />
                 <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)', padding: '16px' }} />
                 <Area type="step" dataKey="v1" stroke="#50CD89" strokeWidth={4} fill="url(#colorSec)" animationDuration={2500} />
                 <Area type="step" dataKey="v2" stroke="#009EF7" strokeWidth={4} fill="url(#colorThrt)" animationDuration={2000} />

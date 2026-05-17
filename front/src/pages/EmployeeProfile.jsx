@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Shield, Bell, Settings, Lock, Smartphone } from 'lucide-react';
+import api from '../services/api';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -19,6 +20,38 @@ export default function EmployeeProfile() {
   const [emailNotif, setEmailNotif] = useState(true);
   const [pushNotif, setPushNotif] = useState(false);
   const [profile, setProfile] = useState({ firstName: '', lastName: '', email: '', role: '', department: '', securityScore: null, lastLogin: '' });
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const userId = localStorage.getItem('userId');
+        if (!userId) return;
+        const response = await api.get(`/api/dashboard/employees/${userId}/profile`);
+        const data = response.data;
+        
+        const nameParts = (data.name || '').trim().split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+
+        setProfile({
+          firstName,
+          lastName,
+          email: data.email || '',
+          role: data.role === 'ROLE_RSSI' ? 'RSSI' : 'Collaborateur',
+          department: data.department || '',
+          securityScore: data.securityScore,
+          lastLogin: data.createdAt ? new Date(data.createdAt).toLocaleDateString('fr-FR', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+          }) : 'Récemment'
+        });
+      } catch (error) {
+        console.error("Error fetching employee profile:", error);
+      }
+    };
+    fetchProfile();
+  }, []);
 
   return (
     <motion.div 

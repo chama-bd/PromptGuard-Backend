@@ -2,6 +2,8 @@ package com.promptguard.api.controller;
 
 import com.promptguard.api.dto.EmployeePortfolioDTO;
 import com.promptguard.api.service.PortfolioService;
+import com.promptguard.api.repository.EmployeeRepository;
+import com.promptguard.api.model.Employee;
 import com.lowagie.text.Document;
 import com.lowagie.text.Font;
 import com.lowagie.text.Paragraph;
@@ -20,12 +22,15 @@ import java.util.UUID;
 public class PortfolioController {
 
     private final PortfolioService portfolioService;
+    private final EmployeeRepository employeeRepository;
 
     // 1. Endpoint pour que Doha affiche le Portfolio sur le Front-end
     @GetMapping("/{employeeId}")
     public ResponseEntity<EmployeePortfolioDTO> getPortfolio(@PathVariable UUID employeeId) {
-        // Pour le hackathon, on passe un nom par défaut "Alex Lao" (ou tu peux le chercher via ton EmployeeRepository)
-        return ResponseEntity.ok(portfolioService.getEmployeePortfolio(employeeId, "Alex Lao"));
+        String employeeName = employeeRepository.findById(employeeId)
+                .map(Employee::getName)
+                .orElse("Collaborateur");
+        return ResponseEntity.ok(portfolioService.getEmployeePortfolio(employeeId, employeeName));
     }
 
     // 2. Endpoint pour le bouton "Exporter en PDF"
@@ -37,7 +42,10 @@ public class PortfolioController {
         response.setHeader(headerKey, headerValue);
 
         // Récupération des données réelles
-        EmployeePortfolioDTO portfolio = portfolioService.getEmployeePortfolio(employeeId, "Alex Lao");
+        String employeeName = employeeRepository.findById(employeeId)
+                .map(Employee::getName)
+                .orElse("Collaborateur");
+        EmployeePortfolioDTO portfolio = portfolioService.getEmployeePortfolio(employeeId, employeeName);
 
         // Génération du document PDF à la volée
         Document document = new Document();
