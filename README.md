@@ -1,6 +1,6 @@
 # SafeRaqib — PromptGuard
 
-SafeRaqib est une plateforme de sécurité SaaS d'entreprise de pointe conçue pour protéger les données confidentielles lors de l'utilisation d'assistants d'Intelligence Artificielle. Elle offre une alternative locale sécurisée aux solutions grand public (comme ChatGPT ou Claude) tout en analysant, filtrant, et contrôlant en temps réel les données exposées par les collaborateurs.
+SafeRaqib (également appelé **PromptGuard**) est une plateforme de sécurité SaaS d'entreprise de pointe conçue pour protéger les données confidentielles lors de l'utilisation d'assistants d'Intelligence Artificielle. Elle offre une alternative locale sécurisée aux solutions grand public (comme ChatGPT ou Claude) tout en analysant, filtrant, et contrôlant en temps réel les données exposées par les collaborateurs.
 
 ---
 
@@ -155,6 +155,215 @@ graph TD
   data: {"content": " est"}
   data: {"content": " primordiale."}
   ```
+
+---
+
+### 5. Messagerie Collaborative Sécurisée & Chat Canaux (Slack-like)
+* **Pourquoi ?**
+  Permettre aux équipes de collaborer en temps réel au sein de différents canaux (publics, privés ou protégés) tout en empêchant la fuite fortuite de secrets d'entreprise (clés API, mots de passe, tokens) dans l'historique d'échange de l'équipe, ce qui violerait les règles internes de sécurité.
+* **Comment ?**
+  Géré par `ChatMessageController.java` et `MessagingService.java` côté backend, s'appuyant sur les tables JPA `channels` et `chat_messages`.
+  À la soumission d'un message, `MessagingService.postMessage` intercepte son contenu et le soumet à `DetectionService.detect()`. Si une donnée sensible (comme une clé AWS ou OpenAI) est repérée, l'enregistrement en base est **immédiatement avorté et annulé**. L'API retourne un statut d'erreur et un message descriptif expliquant quelle menace a été interceptée pour bloquer sa diffusion.
+* **Exemple concret (cURL) :**
+  ```bash
+  curl -X POST http://localhost:8080/api/messages/channels/1/messages \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer <token>" \
+    -d '{"content":"Marc, pour tester utilise la clé sk-proj-12345678901234567890", "sender":"Alice Dev", "senderRole":"Chef de Projet", "senderAvatar":""}'
+  ```
+  **Réponse JSON (Interception & Blocage de publication) :**
+  ```json
+  {
+    "success": false,
+    "warning": true,
+    "reason": "OPENAI_KEY détecté(e)",
+    "matches": [
+      {
+        "type": "OPENAI_KEY",
+        "value": "sk-proj-12345678901234567890",
+        "startPosition": 28,
+        "endPosition": 55,
+        "riskLevel": 5
+      }
+    ],
+    "message": null
+  }
+  ```
+
+---
+
+### 6. Gestionnaire de Tâches IA & Planning Collaboratif (AI Planner)
+* **Pourquoi ?**
+  Permettre aux employés de planifier, créer, éditer et suivre l'avancement de leurs tâches de développement ou d'infrastructure. Ces données d'activité réelles (tâches accomplies) sont agrégées par le système pour alimenter dynamiquement le portfolio professionnel de l'employé sans effort de saisie supplémentaire.
+* **Comment ?**
+  Géré par `MockEspaceEmployeController.java` et `MockEspaceEmployeService.java`. Il assure la persistence de l'entité `Task` liée à l'employé.
+  Le service expose des méthodes pour lister les tâches (`getActualPlannerTasks`), en enregistrer de nouvelles (`createTask`) et faire avancer séquentiellement leur statut d'avancement (de `TODO` à `IN_PROGRESS` puis `DONE`) via la méthode `advanceTaskStatus(taskId)`.
+* **Exemple concret (cURL - Avancement de statut d'une tâche) :**
+  ```bash
+  curl -X PATCH http://localhost:8080/api/mock/planner/12/advance \
+    -H "Authorization: Bearer <token>"
+  ```
+  **Réponse JSON (Statut avancé avec succès) :**
+  ```json
+  {
+    "id": 12,
+    "employeeId": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+    "title": "Mise en place passerelle Ollama",
+    "description": "Déployer le conteneur LLM Mistral local sécurisé",
+    "status": "IN_PROGRESS",
+    "dueDate": "2026-05-20"
+  }
+  ```
+
+---
+
+### 7. Génération Automatique & Export PDF Premium du Portfolio
+* **Pourquoi ?**
+  Valoriser l'excellence technique et le respect des règles de sécurité en évaluant automatiquement les compétences d'un collaborateur (détectées dynamiquement à partir des tâches validées de son planning) et ses indicateurs de conformité, tout en lui permettant d'exporter un rapport PDF de qualité d'impression pour ses revues annuelles.
+* **Comment ?**
+  Géré par `PortfolioController.java` et `PortfolioService.java` côté backend, s'appuyant sur la librairie **OpenPDF**.
+  Lors de l'appel à l'export, le contrôleur interroge `PortfolioService` pour compiler les métriques de l'utilisateur (score sécurité moyen, incidents passés, tâches complétées et projets actifs). Il génère ensuite un document PDF hautement stylisé disposant d'un en-tête bleu marine sombre (`#0B1E3D`), d'une double ligne tricolore, d'une disposition en deux colonnes (une barre latérale à 34% contenant une grille de KPI 2x2, des jauges de progression graphiques et son profil de risque, et une zone de contenu principal à 66% présentant les projets et un encart de briefing IA avec bordure gauche bleue `#378ADD` épaisse de `3.0f`).
+* **Exemple concret (Scénario utilisateur) :**
+  L'employé Alice clique sur le bouton **"Exporter Portfolio PDF"** dans son interface. Le frontend exécute une requête AJAX sécurisée avec son token JWT en configurant le type de retour `blob`. La réponse binaire renvoyée par l'API est alors convertie en un lien d'objet local dans le navigateur pour déclencher instantanément le téléchargement d'un fichier PDF premium nommé `portfolio-alice.pdf`.
+
+---
+
+### 8. Cartographie 3D Interactive des Cyber-Menaces (D3.js integration)
+* **Pourquoi ?**
+  Fournir au RSSI une vue d'ensemble géospatiale dynamique et immédiate des flux de menaces et tentatives de fuites de données sensibles vers des datacenters cloud tiers non autorisés, lui permettant de réagir rapidement face à des anomalies de flux géographiques.
+* **Comment ?**
+  Géré par `MapDataController.java`. L'API expose un endpoint `/api/security/map-data` retournant une liste structurée de flux de données simulés contenant des coordonnées géographiques réelles (latitudes et longitudes de sources comme Paris, Londres, Tokyo, Sydney) pointant vers des destinations de datacenters tiers (AWS East, OpenAI West, Stripe EU). Ces coordonnées sont consommées en frontend par une carte interactive 3D codée en D3.js pour tracer des arcs lumineux colorés en fonction du type et de la sévérité de l'alerte.
+* **Exemple concret (cURL) :**
+  ```bash
+  curl -X GET http://localhost:8080/api/security/map-data \
+    -H "Authorization: Bearer <token>"
+  ```
+  **Réponse JSON :**
+  ```json
+  [
+    {
+      "source": { "lat": 48.8566, "lng": 2.3522, "name": "Paris (User)" },
+      "target": { "lat": 38.8951, "lng": -77.0364, "name": "US-East (AWS)" },
+      "severity": "CRITICAL",
+      "threatType": "AWS_KEY"
+    },
+    {
+      "source": { "lat": 51.5074, "lng": -0.1278, "name": "London (User)" },
+      "target": { "lat": 37.7749, "lng": -122.4194, "name": "US-West (OpenAI)" },
+      "severity": "HIGH",
+      "threatType": "OPENAI_KEY"
+    }
+  ]
+  ```
+
+---
+
+### 9. Tableau de Bord SOC de Supervision du RSSI (RSSI Dashboard)
+* **Pourquoi ?**
+  Offrir au RSSI une visibilité consolidée, temps réel et indiscutable sur la posture de sécurité de l'organisation : volume total de prompts inspectés, incidents bloqués, score de risque moyen et statistiques granulaires de menaces par département pour cibler les efforts de formation ou d'intervention.
+* **Comment ?**
+  Géré par `DashboardController.java` et `DashboardService.java`.
+  * `getStats()` calcule les indicateurs en interrogeant la base de données via `securityIncidentRepository.findAll()`. Il génère une répartition statistique en agrégeant les incidents par département (IT_DEV, HR, LEGAL, RSSI).
+  * `getAllLogs()` fusionne les incidents avec les employés correspondants pour restituer un historique d'audit exhaustif (`PromptLogDto`) incluant le nom de l'employé, son statut, son département, le type de fuite et l'explication cyber détaillée générée par l'IA.
+  * `getIncidentsStatsByDepartment()` distribue proprement les occurrences de menaces sous forme de liste de DTOs pour alimenter les graphiques de l'interface d'administration.
+* **Exemple concret (cURL - Récupération des KPI consolidés) :**
+  ```bash
+  curl -X GET http://localhost:8080/api/dashboard/stats \
+    -H "Authorization: Bearer <token>"
+  ```
+  **Réponse JSON :**
+  ```json
+  {
+    "totalPrompts": 32,
+    "blockedPrompts": 17,
+    "anonymizedPrompts": 9,
+    "averageRiskScore": 72.4,
+    "incidentsByDepartment": {
+      "IT_DEV": 12,
+      "HR": 3,
+      "LEGAL": 2,
+      "RSSI": 0
+    }
+  }
+  ```
+
+---
+
+### 10. Actions de Sécurité et Restriction Manuelle du RSSI (Moderation Rights)
+* **Pourquoi ?**
+  Donner au RSSI le contrôle absolu et **strictement manuel** de restreindre, avertir ou réhabiliter un employé en cas d'infraction répétée aux règles de sécurité. Afin de préserver la productivité et d'éviter les arrêts de travail abusifs causés par des faux positifs automatiques, les restrictions ne s'exécutent jamais de manière automatisée. C'est l'analyste SOC/RSSI qui prend la décision finale en cliquant sur l'interface.
+* **Comment ?**
+  Géré par `DashboardController.java` (`warnEmployee`, `restrictEmployee`, `unrestrictEmployee`) et `DashboardService.java` agissant sur la table `employees` :
+  * `warnEmployee(UUID id)` incrémente manuellement le champ `warningsCount` de l'employé de `+1`.
+  * `restrictEmployee(UUID id)` passe le drapeau `restricted` à `true` en base de données.
+  * `unrestrictEmployee(UUID id)` réhabilite l'employé en basculant `restricted` à `false` et en réinitialisant à `0` son compteur d'avertissements (`warningsCount`) pour lui donner une seconde chance.
+  Si un employé est marqué `restricted == true`, l'endpoint du Chat IA (`/api/incidents/chat/stream`) rejettera proactivement sa requête avec une erreur HTTP 403.
+* **Exemple concret (cURL - Restriction manuelle d'un compte par le RSSI) :**
+  ```bash
+  curl -X POST http://localhost:8080/api/dashboard/employees/a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d/restrict \
+    -H "Authorization: Bearer <token>"
+  ```
+  **Réponse JSON :**
+  ```json
+  {
+    "id": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+    "name": "Alice Dev",
+    "email": "alice@saferaqib.corp",
+    "role": "ROLE_EMPLOYEE",
+    "department": "R&D",
+    "safetyScore": 76.0,
+    "lastLogin": "2026-05-18T00:30:12",
+    "photo": "https://ui-avatars.com/api/?name=Alice+Dev",
+    "restricted": true,
+    "warningsCount": 3
+  }
+  ```
+
+---
+
+### 11. Profilage des Risques & Évaluation Adaptative de l'Employé
+* **Pourquoi ?**
+  Permettre au RSSI d'analyser en détail la dangerosité et le comportement d'un collaborateur spécifique via des scores dynamiques personnalisés afin de prendre une décision éclairée d'avertissement ou de restriction.
+* **Comment ?**
+  Géré par `DashboardService.getEmployeeProfile(UUID employeeId)`. Le service calcule de façon dynamique :
+  * **Safety Score individuel :** Démarre à un niveau de confiance de `100` et décroît de `12 points par incident de sécurité` enregistré sous le nom de l'utilisateur en BDD (plafonné à `0`).
+  * **Dernière activité suspecte :** Calcule dynamiquement le timestamp le plus récent parmi ses incidents enregistrés en base pour l'indiquer comme date de dernière interaction à risque.
+* **Exemple concret (cURL) :**
+  ```bash
+  curl -X GET http://localhost:8080/api/dashboard/employees/a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d/profile \
+    -H "Authorization: Bearer <token>"
+  ```
+  **Réponse JSON :**
+  ```json
+  {
+    "id": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+    "name": "Alice Dev",
+    "email": "alice@saferaqib.corp",
+    "role": "ROLE_EMPLOYEE",
+    "department": "R&D",
+    "safetyScore": 76.0,
+    "lastLogin": "2026-05-18T00:30:12",
+    "photo": "https://ui-avatars.com/api/?name=Alice+Dev",
+    "restricted": false,
+    "warningsCount": 2
+  }
+  ```
+
+---
+
+### 12. Analyse Textuelle & Extraction Intelligente des Compétences (Skills Generation)
+* **Pourquoi ?**
+  Éviter aux employés de saisir manuellement leurs compétences techniques dans leur portfolio d'évaluation. Le système analyse intelligemment leurs activités réelles et extraits dynamiquement leurs savoir-faire à partir du vocabulaire employé dans leurs tâches.
+* **Comment ?**
+  Géré par `PortfolioService.getEmployeePortfolio(UUID employeeId, String name)`.
+  Le service charge les tâches de l'employé depuis `TaskRepository`. Il analyse ensuite textuellement (en convertissant en minuscules) le titre et la description de chaque tâche pour en extraire des mots-clés spécifiques :
+  * Si présence de `"leak"`, `"java"` ou `"spring"` ➔ Ajoute la compétence `"Java Spring Boot"`.
+  * Si présence de `"security"`, `"conformité"` ou `"promptguard"` ➔ Ajoute la compétence `"AI Security & Compliance"`.
+  * Si présence de `"api"` ou `"controller"` ➔ Ajoute la compétence `"Architecture REST API"`.
+  * Si présence de `"front"`, `"react"` ou `"interface"` ➔ Ajoute la compétence `"React.js / Tailwind"`.
+  * En l'absence de tâches ou correspondances, injecte les compétences de base `"Git / GitHub"` et `"Software Engineering"` pour garantir un rendu propre de l'interface.
+* **Exemple concret (Scénario utilisateur) :**
+  Un collaborateur ajoute une tâche intitulée *"Sécuriser le controller de chat avec Spring Boot"* dans son planning. À l'affichage de son Portfolio, le système extrait automatiquement et dynamiquement les compétences : **"Java Spring Boot"**, **"Architecture REST API"** et **"AI Security & Compliance"** !
 
 ---
 
