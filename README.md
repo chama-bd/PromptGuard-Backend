@@ -158,6 +158,106 @@ graph TD
 
 ---
 
+### 5. Messagerie Collaborative Sécurisée & Chat Canaux (Slack-like)
+* **Pourquoi ?**
+  Permettre aux équipes de collaborer en temps réel au sein de différents canaux (publics, privés ou protégés) tout en empêchant la fuite fortuite de secrets d'entreprise (clés API, mots de passe, tokens) dans l'historique d'échange de l'équipe, ce qui violerait les règles internes de sécurité.
+* **Comment ?**
+  Géré par `ChatMessageController.java` et `MessagingService.java` côté backend, s'appuyant sur les tables JPA `channels` et `chat_messages`.
+  À la soumission d'un message, `MessagingService.postMessage` intercepte son contenu et le soumet à `DetectionService.detect()`. Si une donnée sensible (comme une clé AWS ou OpenAI) est repérée, l'enregistrement en base est **immédiatement avorté et annulé**. L'API retourne un statut d'erreur et un message descriptif expliquant quelle menace a été interceptée pour bloquer sa diffusion.
+* **Exemple concret (cURL) :**
+  ```bash
+  curl -X POST http://localhost:8080/api/messages/channels/1/messages \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer <token>" \
+    -d '{"content":"Marc, pour tester utilise la clé sk-proj-12345678901234567890", "sender":"Alice Dev", "senderRole":"Chef de Projet", "senderAvatar":""}'
+  ```
+  **Réponse JSON (Interception & Blocage de publication) :**
+  ```json
+  {
+    "success": false,
+    "warning": true,
+    "reason": "OPENAI_KEY détecté(e)",
+    "matches": [
+      {
+        "type": "OPENAI_KEY",
+        "value": "sk-proj-12345678901234567890",
+        "startPosition": 28,
+        "endPosition": 55,
+        "riskLevel": 5
+      }
+    ],
+    "message": null
+  }
+  ```
+
+---
+
+### 6. Gestionnaire de Tâches IA & Planning Collaboratif (AI Planner)
+* **Pourquoi ?**
+  Permettre aux employés de planifier, créer, éditer et suivre l'avancement de leurs tâches de développement ou d'infrastructure. Ces données d'activité réelles (tâches accomplies) sont agrégées par le système pour alimenter dynamiquement le portfolio professionnel de l'employé sans effort de saisie supplémentaire.
+* **Comment ?**
+  Géré par `MockEspaceEmployeController.java` et `MockEspaceEmployeService.java`. Il assure la persistence de l'entité `Task` liée à l'employé.
+  Le service expose des méthodes pour lister les tâches (`getActualPlannerTasks`), en enregistrer de nouvelles (`createTask`) et faire avancer séquentiellement leur statut d'avancement (de `TODO` à `IN_PROGRESS` puis `DONE`) via la méthode `advanceTaskStatus(taskId)`.
+* **Exemple concret (cURL - Avancement de statut d'une tâche) :**
+  ```bash
+  curl -X PATCH http://localhost:8080/api/mock/planner/12/advance \
+    -H "Authorization: Bearer <token>"
+  ```
+  **Réponse JSON (Statut avancé avec succès) :**
+  ```json
+  {
+    "id": 12,
+    "employeeId": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+    "title": "Mise en place passerelle Ollama",
+    "description": "Déployer le conteneur LLM Mistral local sécurisé",
+    "status": "IN_PROGRESS",
+    "dueDate": "2026-05-20"
+  }
+  ```
+
+---
+
+### 7. Génération Automatique & Export PDF Premium du Portfolio
+* **Pourquoi ?**
+  Valoriser l'excellence technique et le respect des règles de sécurité en évaluant automatiquement les compétences d'un collaborateur (détectées dynamiquement à partir des tâches validées de son planning) et ses indicateurs de conformité, tout en lui permettant d'exporter un rapport PDF de qualité d'impression pour ses revues annuelles.
+* **Comment ?**
+  Géré par `PortfolioController.java` et `PortfolioService.java` côté backend, s'appuyant sur la librairie **OpenPDF**.
+  Lors de l'appel à l'export, le contrôleur interroge `PortfolioService` pour compiler les métriques de l'utilisateur (score sécurité moyen, incidents passés, tâches complétées et projets actifs). Il génère ensuite un document PDF hautement stylisé disposant d'un en-tête bleu marine sombre (`#0B1E3D`), d'une double ligne tricolore, d'une disposition en deux colonnes (une barre latérale à 34% contenant une grille de KPI 2x2, des jauges de progression graphiques et son profil de risque, et une zone de contenu principal à 66% présentant les projets et un encart de briefing IA avec bordure gauche bleue `#378ADD` épaisse de `3.0f`).
+* **Exemple concret (Scénario utilisateur) :**
+  L'employé Alice clique sur le bouton **"Exporter Portfolio PDF"** dans son interface. Le frontend exécute une requête AJAX sécurisée avec son token JWT en configurant le type de retour `blob`. La réponse binaire renvoyée par l'API est alors convertie en un lien d'objet local dans le navigateur pour déclencher instantanément le téléchargement d'un fichier PDF premium nommé `portfolio-alice.pdf`.
+
+---
+
+### 8. Cartographie 3D Interactive des Cyber-Menaces (D3.js integration)
+* **Pourquoi ?**
+  Fournir au RSSI une vue d'ensemble géospatiale dynamique et immédiate des flux de menaces et tentatives de fuites de données sensibles vers des datacenters cloud tiers non autorisés, lui permettant de réagir rapidement face à des anomalies de flux géographiques.
+* **Comment ?**
+  Géré par `MapDataController.java`. L'API expose un endpoint `/api/security/map-data` retournant une liste structurée de flux de données simulés contenant des coordonnées géographiques réelles (latitudes et longitudes de sources comme Paris, Londres, Tokyo, Sydney) pointant vers des destinations de datacenters tiers (AWS East, OpenAI West, Stripe EU). Ces coordonnées sont consommées en frontend par une carte interactive 3D codée en D3.js pour tracer des arcs lumineux colorés en fonction du type et de la sévérité de l'alerte.
+* **Exemple concret (cURL) :**
+  ```bash
+  curl -X GET http://localhost:8080/api/security/map-data \
+    -H "Authorization: Bearer <token>"
+  ```
+  **Réponse JSON :**
+  ```json
+  [
+    {
+      "source": { "lat": 48.8566, "lng": 2.3522, "name": "Paris (User)" },
+      "target": { "lat": 38.8951, "lng": -77.0364, "name": "US-East (AWS)" },
+      "severity": "CRITICAL",
+      "threatType": "AWS_KEY"
+    },
+    {
+      "source": { "lat": 51.5074, "lng": -0.1278, "name": "London (User)" },
+      "target": { "lat": 37.7749, "lng": -122.4194, "name": "US-West (OpenAI)" },
+      "severity": "HIGH",
+      "threatType": "OPENAI_KEY"
+    }
+  ]
+  ```
+
+---
+
 ## 🔄 Flux complet de traitement d'un prompt
 
 Voici le parcours détaillé à travers l'architecture de SafeRaqib lorsqu'un collaborateur soumet un message au chat sécurisé :
